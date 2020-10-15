@@ -46,11 +46,12 @@ def set_pvs():
     epics_pvs['CloseShutter']        = PV(epics_pvs['CloseShutterPVName'].get(as_string=True))
     epics_pvs['OpenShutter']         = PV(epics_pvs['OpenShutterPVName'].get(as_string=True))
     epics_pvs['ShutterStatus']       = PV('PA:02BM:STA_A_FES_OPEN_PL')
+    epics_pvs['BeamReady']           = PV('ACIS:ShutterPermit')
 
     return epics_pvs
 
 
-def open_shutter(epics_pvs):
+def open_frontend_shutter(epics_pvs):
     """Opens the shutter to collect flat fields or projections.
 
     The value in the ``OpenShutterValue`` PV is written to the ``OpenShutter`` PV.
@@ -67,7 +68,7 @@ def open_shutter(epics_pvs):
         status = epics_pvs['ShutterStatus'].get(as_string=True)
         log.info('shutter status: %s', status)
 
-def close_shutter(epics_pvs):
+def close_frontend_shutter(epics_pvs):
     """Closes the shutter to collect dark fields.
 
     The value in the ``CloseShutterValue`` PV is written to the ``CloseShutter`` PV.
@@ -105,9 +106,9 @@ def main(arg):
     epics_pvs = set_pvs()
 
     if args.open:
-    	open_shutter(epics_pvs)
+    	open_frontend_shutter(epics_pvs)
     else:
-    	close_shutter(epics_pvs)
+    	close_frontend_shutter(epics_pvs)
 
 
 if __name__ == "__main__":
