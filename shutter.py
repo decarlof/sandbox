@@ -7,6 +7,41 @@ from datetime import datetime
 
 import log
 
+def wait_frontend_shutter(self, timeout=-1):
+    """Waits for the front end shutter to open, or for ``abort_scan()`` to be called.
+
+    While waiting this method periodically tries to open the shutter..
+
+    Parameters
+    ----------
+    timeout : float
+        The maximum number of seconds to wait before raising a ShutterTimeoutError exception.
+
+    Raises
+    ------
+    ScanAbortError
+        If ``abort_scan()`` is called
+    ShutterTimeoutError
+        If the open shutter has not completed within timeout value.
+    """
+
+    start_time = time.time()
+    pv = self.epics_pvs['OpenShutter']
+    value = self.epics_pvs['OpenShutterValue'].get(as_string=True)
+            # status = self.epics_pvs['ShutterStatus'].get(as_string=True)
+            # log.info('shutter status: %s', status)
+            # log.info('open shutter: %s, value: %s', pv, value)
+    while True:
+        if self.epics_pvs['ShutterStatus'].value == 1:
+            return
+        if not self.scan_is_running:
+            raise ScanAbortError
+        time.sleep(1.0)
+        self.epics_pvs['OpenShutter'].put(value, wait=True)
+        if timeout > 0:
+            if elapsed_time >= timeout:
+                raise ShutterTimeoutError()
+
 def wait_pv(epics_pv, wait_val, timeout=-1):
     """Wait on a pv to be a value until max_timeout (default forever)
        delay for pv to change
