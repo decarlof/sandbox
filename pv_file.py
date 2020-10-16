@@ -72,17 +72,16 @@ def show_pvs():
       file plugin, etc.
     """
 
-    print('configPVS:')
+    print('--------------------------------')
+    print('configPVS::')
     for config_pv in config_pvs:
         print(config_pv, ':', config_pvs[config_pv].get(as_string=True))
 
-    print('')
-    print('controlPVS:')
+    print('controlPVS::')
     for control_pv in control_pvs:
         print(control_pv, ':', control_pvs[control_pv].get(as_string=True))
 
-    print('')
-    print('pv_prefixes:')
+    print('pv_prefixes::')
     for pv_prefix in pv_prefixes:
         print(pv_prefix, ':', pv_prefixes[pv_prefix])
 
@@ -102,7 +101,7 @@ def test():
     print("1", control_pvs['StreamOrthoX'].upper_ctrl_limit)
     print(control_pvs['StreamOrthoXlimit'].get())
 
-    # ALSO I NEED TOHAVE WRITE ACCESS, BUT THIS EVEN DOESNT WORK:
+    # ALSO I NEED TO HAVE WRITE ACCESS, BUT THIS EVEN DOESNT WORK:
     # control_pvs['StreamOrthoX'].upper_disp_limit = 2000
     # control_pvs['StreamOrthoX'].upper_ctrl_limit = 2000
 
@@ -121,12 +120,12 @@ def main():
     for pv_file in pv_files:
         read_pv_file(pv_file, macros)
         show_pvs()
-    print(config_pvs['OrthoX'])
-    print(config_pvs['OrthoX'].type)
-    print(config_pvs['OrthoX'].access)
-    print(config_pvs['OrthoX'].count)
-    print(config_pvs['OrthoX'].info)
-    print(config_pvs['OrthoX'].get())
+    # print(config_pvs['OrthoX'])
+    # print(config_pvs['OrthoX'].type)
+    # print(config_pvs['OrthoX'].access)
+    # print(config_pvs['OrthoX'].count)
+    # print(config_pvs['OrthoX'].info)
+    # print(config_pvs['OrthoX'].get())
 
 
 if __name__ == "__main__":
