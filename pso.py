@@ -25,3 +25,4 @@ pso_counts_per_rotation = 94400
 PSOEncoderCountsPerStep, rotation_step = compute_positions_PSO(pso_counts_per_rotation, rotation_step)
 rotation_stop = start_angle + rotation_step * (numer_of_angles - 1)
 print(PSOEncoderCountsPerStep, rotation_step, rotation_stop)
+print(180-rotation_stop)
