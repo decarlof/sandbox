@@ -27,13 +27,26 @@ log.setup_custom_logger("test.log")
 #     print (i)
 
 print("-----------------------------")
-start = 30.35
+start = 30.25
 step_size = 1.4
 steps = 3
 end = start + (step_size * steps)
 print(start, step_size, steps, end)
 
-log.info('vertical positions (mm): %s', np.linspace(start, end, steps))
+log.info('vertical positions (mm): %s', np.linspace(start, end, steps, endpoint=False))
 
-for i in np.linspace(start, end, steps):
+for i in np.linspace(start, end, steps, endpoint=False):
     print (i)
+
+print("-----------------------------")
+start = 30.25
+step_size = 1.4
+steps = 3
+end = start + (step_size * steps)
+print(start, step_size, steps, end-step_size)
+
+log.info('vertical positions (mm): %s', np.linspace(start, end-step_size, steps))
+
+for i in np.linspace(start, end-step_size, steps):
+    print (i)
+
