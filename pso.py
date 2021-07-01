@@ -20,6 +20,7 @@ def compute_positions_PSO(PSOCountsPerRotation, rotation_step):
 start_angle = 0
 rotation_step = 0.12
 numer_of_angles = 1500
+print(start_angle + rotation_step *(numer_of_angles-1))
 pso_counts_per_rotation = 94400
 PSOEncoderCountsPerStep, rotation_step = compute_positions_PSO(pso_counts_per_rotation, rotation_step)
 rotation_stop = start_angle + rotation_step * (numer_of_angles - 1)
