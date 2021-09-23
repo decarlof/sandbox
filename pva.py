@@ -1,27 +1,13 @@
 
 from epics import PV
-import pvaccess
+import pvaccess as pva
 import time
 
+epics_pv = {}
 
-def connectionCallback(isConnected):
-    print('Channel connected: %s' % isConnected)
-
-
-
-# pv = PV('2bmb:m1')
-# time.sleep(1)
-# print(pv.connected)
-
-
-pva = pvaccess.PvObject({'value': [pvaccess.pvaccess.ScalarType.FLOAT], 
-                'sizex': pvaccess.pvaccess.ScalarType.INT, 
-                'sizey': pvaccess.pvaccess.ScalarType.INT})
-pvaServer = pvaccess.PvaServer('name', pva)
-time.sleep(1)
-
-channel = pvaccess.Channel('name')
-print(channel)
-time.sleep(1)
-
-channel.setConnectionCallback(connectionCallback)
+epics_pv['ImagePVAPName'] = PV('2bmbPG1:Pva1:')
+# pva type channel that contains projection and metadata
+image_pv_name = PV(epics_pvs['ImagePVAPName'].get()).get()
+epics_pvs['PvaPImage']          = pva.Channel(image_pv_name + 'Image')
+epics_pvs['PvaPDataType_RBV']   = pva.Channel(image_pv_name + 'DataType_RBV')
+pva_plugin_image = epics_pvs['PvaPImage']
