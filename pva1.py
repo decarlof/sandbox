@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def streaming():
+def streaming(buff):
     PVA_prefix = '2bmbPG1:Pva1:'
 
     pva_data      = pva.Channel(PVA_prefix + 'Image')
@@ -34,12 +34,12 @@ def streaming():
     
     # buffer is continuously update with monitoring
     # the detector pv (function addProjection), called inside pv monitor
-    databuffer = np.zeros([10, height, width], dtype='float32')
+    databuffer = np.zeros([buff, height, width], dtype='float32')
 
     def addProjection(pv):
         curid = pv['uniqueId']
         print(curid)
-        databuffer[np.mod(curid, 10)] = pv['value'][0]['ubyteValue'].reshape(
+        databuffer[np.mod(curid, buff)] = pv['value'][0]['ubyteValue'].reshape(
             height, width).astype('float32')
 
     pva_data.monitor(addProjection, '')
@@ -49,4 +49,5 @@ def streaming():
         # print('new image')
 if __name__ == "__main__":
 
-    streaming()
+    buff = 50
+    streaming(buff)
