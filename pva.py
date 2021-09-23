@@ -6,8 +6,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-epics_pvs={}
-
 PVA_prefix = '2bmbPG1:Pva1:'
 
 pva_data      = pva.Channel(PVA_prefix + 'Image')
@@ -24,6 +22,7 @@ image_np = np.reshape(image[0]['ubyteValue'], (width, height))
 print(width, height)
 print(image_np.shape)
 
-plt.imshow(image_np)
-plt.show()
-
+# plt.imshow(image_np)
+# plt.show()
+print(pva_data_dict)
+print(image[0])
