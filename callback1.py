@@ -4,7 +4,8 @@ from epics import PV
 def on_change(pvname=None, value=None, char_value=None, **kw):
 
     message = pvname + ': ' + 'value = ' + str(value) + '; char = ' + char_value 
-    print(message)
+    # print(message)
+    print(kw)
 
 shutter_permit = PV('ACIS:ShutterPermit')
 shutter_permit.add_callback(on_change)
