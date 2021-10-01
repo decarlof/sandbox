@@ -13,8 +13,17 @@ f_dict = {'ring'                 : {'s_current': 'S:SRcurrentAI', 'shutter_statu
            }
 
 
+f_dict ={'ring':       {'Current (mA)': 'S:SRcurrentAI', 'Main Shutter': 'EPS:29:ID:SS2:POSITION', 'C Shutter': 'PA:29ID:SCS_BLOCKING_BEAM.VAL', 'D Shutter': 'PA:29ID:SDS_BLOCKING_BEAM.VAL', 'Beam Permit': 'ACIS:ShutterPermit'},
+         'eps':       {'AlarmA:Green': '29id:BLEPS:ALARM:GREEN','AlarmA:Red': '29id:BLEPS:ALARM:RED','AlarmC:Green': '29id:BLEPS:ARPES:GREEN','AlarmC:Red': '29id:BLEPS:ARPES:RED','AlarmD:Green': '29id:BLEPS:RSXS:GREEN','AlarmD:Red': '29id:BLEPS:RSXS:RED'},
+         'energy':     {'mono RBV (eV)': '29idmono:ENERGY_MON','mono SP (eV)': '29idmono:ENERGY_SP','mirror': '29idmonoMIR_TYPE_MON','grating': '29idmonoGRT_TYPE_MON','ID RBV (keV)': 'ID29:Energy.VAL','ID SP (keV)': 'ID29:EnergySet.VAL','ID Mode': 'ID29:ActualMode','ID QP (%)': 'ID29:QuasiRatio.RVAL'},
+         'arpes':      {'exit slit (um)': '29idb:Slit3CRBV','x': '29idc:m1.RBV','y': '29idc:m2.RBV','z': '29idc:m3.RBV','th': '29idc:m4.RBV','chi': '29idc:m5.RBV','phi': '29idc:m6.RBV','T sample (K)': '29idARPES:LS335:TC1:IN1','T coldfinger (K)': '29idARPES:LS335:TC1:IN2','P chamber (Torr)': '29idc:VS11C.VAL','P cube (Torr)': '29idc:VSCUBE.VAL'},
+         'kappa':      {'exit slit (um)': '29idb:Slit4Vsize.VAL','x': '29idKappa:m2.RBV','y': '29idKappa:m3.RBV','z': '29idKappa:m4.RBV','tth': '29idKappa:m9.RBV','kth': '29idKappa:m8.RBV','kap': '29idKappa:m7.RBV','kphi': '29idKappa:m1.RBV','th': '29idKappa:Euler_ThetaRBV','chi': '29idKappa:Euler_ChiRBV','phi': '29idKappa:Euler_PhiRBV','T sample (K)': '29idd:LS331:TC1:SampleA','T coldfinger (K)': '29idd:LS331:TC1:SampleB','P chamber (Torr)': '29idb:VS11D.VAL','P loadlock (Torr)': '29idb:VS12D.VAL'},
+         'scanc':      {'scan number': '29idARPES:saveData_fileName','scan status': '29idARPES:scan1.SMSG','scan progress (%)': '29idARPES:scanProgress:percentDone','time remaining': '29idARPES:scanProgress:remainingTimeStr','scan positionner': '29idARPES:scan1.P1PV'},
+         'scand':      {'scan number': '29idKappa:saveData_fileName','scan status': '29idKappa:scan1.SMSG','scan progress (%)': '29idKappa:scanProgress:percentDone','time remaining': '29idKappa:scanProgress:remainingTimeStr','scan positionner': '29idKappa:scan1.P1PV'},
+         'temperature':{'arpes_sample': '29idARPES:LS335:TC1:IN1','arpes_coldfinger': '29idARPES:LS335:TC1:IN2','kappa_sample': '29idd:LS331:TC1:SampleA','kappa_coldfinger': '29idd:LS331:TC1:SampleB','hydra_arpes': '29idc:LS340:TC2:Control','hydra_kappa': '29idc:LS340:TC2:Sample'},
+         'pressure':   {'kappa_chamber': '29idb:VS11D.VAL','kappa_loadlock': '29idb:VS12D.VAL','arpes_chamber': '29idc:VS11C.VAL','arpes_cube': '29idc:VSCUBE.VAL'}
+         }
 
-
-with open('pv.json', 'w') as fp:
+with open('pv_29id.json', 'w') as fp:
     json.dump(f_dict, fp)
 
