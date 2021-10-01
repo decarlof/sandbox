@@ -1,0 +1,12 @@
+{
+    "ring": {
+        "acis_shutter_permit": "ACIS:ShutterPermit",
+        "ops_message1": "OPS:message5",
+        "ops_message2": "OPS:message5",
+        "ops_message3": "OPS:message5",
+        "ops_message4": "OPS:message5",
+        "ops_message5": "OPS:message5",
+        "s_current": "S:SRcurrentAI",
+        "s_desired_mode": "S:DesiredMode"
+    }
+}
