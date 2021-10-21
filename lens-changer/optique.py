@@ -4,6 +4,10 @@ import json
 
 data_path = '.'
 
+
+lens_name = PV(2bm:MCTOptics:LensName0).value
+print(lens_name)
+
 with open(os.path.join(data_path, 'camera.json')) as json_file:
     camera_lookup = json.load(json_file)
 with open(os.path.join(data_path, 'lens.json')) as json_file:
