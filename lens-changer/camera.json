@@ -10,5 +10,11 @@
     },
     "Q-12A180-Fm/CXP-6": {
         "detector_pixel_size": 5.5
+    },
+    "FLIR": {
+        "detector_pixel_size": 3.45
+    },
+    "ADIMEC": {
+        "detector_pixel_size": 5.5
     }
 }
