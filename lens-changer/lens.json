@@ -1,0 +1,20 @@
+{
+    "10": {
+        "scintillator_type":"ESRF",
+        "scintillator_thickness": 20,
+        "magnification": 10,
+        "tube_lens": 1.0
+    },
+    "5": {
+        "scintillator_type":"ESRF",
+        "scintillator_thickness": 20,
+        "magnification": 5,
+        "tube_lens": 1.0
+    },
+    "1.1": {
+        "scintillator_type":"ESRF",
+        "scintillator_thickness": 20,
+        "magnification": 1.1,
+        "tube_lens": 1.0
+    }
+}

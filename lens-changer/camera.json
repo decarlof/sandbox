@@ -1,0 +1,14 @@
+{
+    "Grasshopper3 GS3-U3-23S6M": {
+        "detector_pixel_size": 5.86
+    },
+    "Grasshopper3 GS3-U3-51S5M": {
+        "detector_pixel_size": 3.45
+    },
+    "Oryx ORX-10G-51S5M": {
+        "detector_pixel_size": 3.45
+    },
+    "Q-12A180-Fm/CXP-6": {
+        "detector_pixel_size": 5.5
+    }
+}
