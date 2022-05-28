@@ -42,6 +42,50 @@ from dm import BssApsDbApi
 
 dm_api = BssApsDbApi()
 
+def get_current_emails(exclude_pi=True):
+    """
+    Find user's emails currently running at beamline
+     
+    Parameters
+    ----------
+    users : dictionary-like object containing user information
+    
+    
+    Returns
+    -------
+    List of user emails (default: all but PI)       
+    """
+    emails = []
+    
+    users = get_current_users()
+    if not users:
+        return None
+
+    for u in users:
+        if exclude_pi and 'piFlag' in u.keys() and u['piFlag'] == 'Y':
+            continue
+        if 'email' in u.keys() and u['email'] != None:
+            emails.append(str(u['email']).lower())
+            print('Added {0:s} to the e-mail list.'.format(emails[-1]))
+        else:            
+            print("    Missing e-mail for badge {0:6d}, {1:s} {2:s}, institution {3:s}"
+                    .format(u['badge'], u['firstName'], u['lastName'], u['institution']))
+    return emails
+
+def get_current_users():
+    """
+    Get users running at beamline currently
+    
+    Returns
+    -------
+    users : dictionary-like object containing user information      
+    """
+    proposal = get_current_proposal()
+    if not proposal:
+        log.warning("No current valid proposal")
+        return None
+    return proposal['experimenters']
+
 def get_current_proposal_id():
     """
     Get the proposal id for the current proposal.
@@ -51,8 +95,9 @@ def get_current_proposal_id():
     proposal ID as an int
     """
     proposal = get_current_proposal()
+    # print(proposal)
     if not proposal:
-        log.warning("No current valid proposal")
+        print("No current valid proposal")
         return None
     return str(get_current_proposal()['id'])
 
@@ -66,8 +111,9 @@ def get_current_proposal():
     dict-like object with information for current proposal
     """
     proposals = dm_api.listProposals()
+    # print(proposals)
     # time_now = dt.datetime.now(pytz.utc)
-    time_now = dt.datetime(2021, 7, 3, 8, 15, 12, 0, pytz.UTC)
+    time_now = dt.datetime(2021, 11, 6, 8, 15, 12, 0, pytz.UTC)
     for prop in proposals:
         for i in range(len(prop['activities'])):
             prop_start = dt.datetime.fromisoformat(prop['activities'][i]['startTime'])
@@ -89,7 +135,7 @@ def slack():
         # conversations_create requires the channels:manage bot scope
         result = client.conversations_create(
             # The name of the conversation
-            name='c4564656'
+            name='d4564656'
         )
         # Log the result which includes information like the ID of the conversation
         print(result)
@@ -99,9 +145,32 @@ def slack():
 
 def main():
 
-    # proposal_id = get_current_proposal_id()
-    # print(proposal_id)
-    slack()
+    proposal_id = get_current_proposal_id()
+    print(proposal_id)
+    print(get_current_emails())
+    # slack()
 
 if __name__ == '__main__':
     main()
+
+
+    #     users = scheduling.get_current_users(args)
+    #     emails = scheduling.get_current_emails(users, exclude_pi=False)
+    #     emails.append(args.primary_beamline_contact_email)
+    #     emails.append(args.secondary_beamline_contact_email)
+    #     for email in emails:
+    #         args.pi_email = email
+    #         log.warning('Sharing %s%s with %s' % (args.globus_server_top_dir, new_dir, args.pi_email))
+    #         globus.share_globus_dir(args, ac, tc)
+    # else:
+    #     log.error("%s is not a supported globus server" % args.globus_server_name)
+
+    # def yes_or_no(question):
+    # answer = str(input(question + " (Y/N): ")).lower().strip()
+    # while not(answer == "y" or answer == "yes" or answer == "n" or answer == "no"):
+    #     log.warning("Input yes or no")
+    #     answer = str(input(question + "(Y/N): ")).lower().strip()
+    # if answer[0] == "y":
+    #     return True
+    # else:
+    #     return False
