@@ -11,12 +11,16 @@ temp_read = PV('2bmb:ET2k:1:Temperature')
 
 temp_cur = temp_read.get()
 temp = np.arange(temp_cur,temp_goal,ramp_rate/60)
+
+# print(temp)
+
 for t in temp:
-    print(f'set temp to {t:0.2f} deg')
+    print(f'set temp to {t:0.2f} deg {temp_read.get():0.2f}')
     temp_set.put(t,wait=True)
-    # while (np.abs(temp_read.get()-t)>1):
-    #     pass
-    #     time.sleep(1)
+    while (np.abs(temp_read.get()-t)>1):
+        print(f'wait on {temp_read.get():0.2f} to reach {t:0.2}')
+        # pass
+        time.sleep(1)
     time.sleep(1)
 
 
