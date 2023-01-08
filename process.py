@@ -7,5 +7,13 @@ energy      = "18.00"
 file_name   = 'energy2bm_' + energy_mode +"_" + energy + ".conf"
 full_file_name = os.path.join(data_path, file_name)
 
-command = 'energy set --config %s --testing' % (full_file_name)
-subprocess.run(f"""energy -c command""", shell=True, executable='/bin/bash', check=True)
+# command = '--testing --force --config %s' % (full_file_name)
+# print('energy set %s'% command)
+# # exit()
+# subprocess.run(f"""
+#     energy set -c command""",
+#     shell=True, executable='/bin/bash', check=True)
+
+command = 'energy set --testing --force --config %s' % (full_file_name)
+print(command)
+subprocess.Popen(command, shell=True)
