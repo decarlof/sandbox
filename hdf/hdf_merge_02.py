@@ -15,14 +15,14 @@ try:
             os.makedirs(out_dir)
 
         h5_file_list = list(filter(lambda x: x.endswith(('.h5', '.hdf', 'hdf5')), os.listdir(top)))
-        # print(h5_file_list, top)
+        print(top, h5_file_list)
+        # exit()
         if (h5_file_list):
             h5_file_list.sort()
             # print("Found: %s" % h5_file_list) 
             index=0
             for fname in h5_file_list:
-                print("Found: %s" % fname) 
-
+                print("Found: %s" % fname)
                 with h5py.File(os.path.join(out_dir, fname), 'a') as h5w:
                     with h5py.File(fname, 'r') as h5r:
                         try:  # trying to copy meta
