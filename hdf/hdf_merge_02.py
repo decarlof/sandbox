@@ -1,7 +1,9 @@
 import os
 import sys
 import h5py
+import numpy as np
 from pathlib import Path
+
 import meta
 
 try:
@@ -30,17 +32,18 @@ try:
                             print('Reading meta data: ', fname)
                             for key, value in meta_dict.items():
                                 # print(key, value)
-                                dset = h5w.create_dataset(key, data=value[0], dtype=h5r[key].dtype, shape=(1,))
-                                if value[1] is not None:
-                                    s = value[1]
-                                    utf8_type = h5py.string_dtype('utf-8', len(s)+1)
-                                    dset.attrs['units'] =  np.array(s.encode("utf-8"), dtype=utf8_type)
+                                if key.find('exchange') != 1:
+                                    dset = h5w.create_dataset(key, data=value[0], dtype=h5r[key].dtype, shape=(1,))
+                                    if value[1] is not None:
+                                        s = value[1]
+                                        utf8_type = h5py.string_dtype('utf-8', len(s)+1)
+                                        dset.attrs['units'] =  np.array(s.encode("utf-8"), dtype=utf8_type)
                         except:
                             print('ERROR: Skip copying meta')
                             pass
 
                         print('Reading data: ', fname)
-                        ds_arr = h5r['exchange/data'][...]
+                        ds_arr = h5r['exchange/data'][:,:,:]
                         print ('Saving', ':', ds_arr.dtype, ds_arr.shape, 'to: ', os.path.join(out_dir, fname))
                         h5w.create_dataset('exchange/data', data=ds_arr[:])
         else:
