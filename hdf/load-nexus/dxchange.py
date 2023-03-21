@@ -53,11 +53,6 @@ def read_nexus(fname,
         1D theta in radian.
     """
 
-    dataset_grp = '/'.join([data_path, 'data'])
-    theta_grp   = '/'.join([data_path, 'rotation_angle'])
-
-    dataset = read_hdf5(fname, dataset_grp, slc=(proj, sino), dtype=dtype)
-    angles   = read_hdf5(fname, theta_grp, slc=None)
 
     # Get the indices of where the data, flat and dark are the dataset
     with h5.File(fname, "r") as file:
@@ -73,10 +68,22 @@ def read_nexus(fname,
             elif int(key) == 2:
                 darks_indices.append(i)
 
-        darks = [dataset[x] for x in darks_indices]
-        flats = [dataset[x] for x in flats_indices]
-        tomo  = [dataset[x] for x in data_indices]
-        theta = [angles[x] for x in data_indices]
+    dataset_grp = '/'.join([data_path, 'data'])
+    theta_grp   = '/'.join([data_path, 'rotation_angle'])
+
+    dataset = read_hdf5(fname, dataset_grp, slc=(proj, sino), dtype=dtype)
+    angles  = read_hdf5(fname, theta_grp, slc=None)
+
+    # Get the indices of where the data, flat and dark are the dataset
+    with h5.File(fname, "r") as file:
+        data_indices  = []
+        darks_indices = []
+        flats_indices = []
+
+        tomo  = dataset[np.where(np.array(file[image_key_path][:]) == 0.0)[0]]
+        dark  = dataset[np.where(np.array(file[image_key_path][:]) == 2.0)[0]]
+        flat  = dataset[np.where(np.array(file[image_key_path][:]) == 1.0)[0]]
+        theta = angles[np.where(np.array(file[image_key_path][:])  == 0.0)[0]]
 
     theta = np.deg2rad(theta)
     return tomo, flat, dark, theta
