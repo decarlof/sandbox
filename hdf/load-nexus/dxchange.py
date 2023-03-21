@@ -12,8 +12,8 @@ def read_nexus(fname,
                proj=None, 
                sino=None, 
                dtype=None,
-               data_path="/entry1/tomo_entry/data/", 
-               angle_path="/entry1/tomo_entry/data/",
+               data_path="/entry1/tomo_entry/data/data", 
+               angle_path="/entry1/tomo_entry/data/rotation_angle",
                image_key_path="/entry1/instrument/image_key/image_key"):
     """
     Read NeXus tomo HDF5 format.
@@ -68,24 +68,20 @@ def read_nexus(fname,
             elif int(key) == 2:
                 darks_indices.append(i)
 
-    dataset_grp = '/'.join([data_path, 'data'])
-    theta_grp   = '/'.join([data_path, 'rotation_angle'])
+    dataset_grp = data_path
+    theta_grp   = angle_path
 
-    dataset = read_hdf5(fname, dataset_grp, slc=(proj, sino), dtype=dtype)
-    angles  = read_hdf5(fname, theta_grp, slc=None)
+    if proj==None:
+        tomo = read_hdf5(fname, dataset_grp, slc=((data_indices[0], data_indices[-1], 1), sino), dtype=dtype)
+    else:
+        tomo = read_hdf5(fname, dataset_grp, slc=(((data_indices[0]+proj[0], min(data_indices[0]+proj[1], data_indices[-1]), proj[2])), sino), dtype=dtype)
 
-    # Get the indices of where the data, flat and dark are the dataset
-    with h5.File(fname, "r") as file:
-        data_indices  = []
-        darks_indices = []
-        flats_indices = []
+    dark   = read_hdf5(fname, dataset_grp, slc=((darks_indices[0], darks_indices[-1], 1), sino), dtype=dtype)
+    flat   = read_hdf5(fname, dataset_grp, slc=((flats_indices[0], flats_indices[-1], 1), sino), dtype=dtype)
+    angles = read_hdf5(fname, theta_grp, slc=None)
 
-        tomo  = dataset[np.where(np.array(file[image_key_path][:]) == 0.0)[0]]
-        dark  = dataset[np.where(np.array(file[image_key_path][:]) == 2.0)[0]]
-        flat  = dataset[np.where(np.array(file[image_key_path][:]) == 1.0)[0]]
-        theta = angles[np.where(np.array(file[image_key_path][:])  == 0.0)[0]]
+    theta = np.deg2rad(angles)
 
-    theta = np.deg2rad(theta)
     return tomo, flat, dark, theta
   
 
@@ -216,7 +212,7 @@ def _make_slice_object_a_tuple(slc):
 def main():
 
     fname = '/local/data/HDF/DLS/110809.nxs'
-    data, darks, flats, theta = read_nexus(fname)
+    data, darks, flats, theta = read_nexus(fname, proj=(0, 10, 1))
 
 if __name__ == '__main__':
     main()
