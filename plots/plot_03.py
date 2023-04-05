@@ -14,10 +14,10 @@ hbars = ax.barh(y_pos, number_of_samples, xerr=tera_bytes, align='center')
 ax.set_yticks(y_pos, labels=dates)
 ax.invert_yaxis()  # labels read top-to-bottom
 ax.set_xlabel('Number of Samples')
-ax.set_title('Tomography data at beamline 2-BM')
+ax.set_title('Tomography raw data at beamline 2-BM')
 
 # Label with given captions, custom padding and annotate options
 ax.bar_label(hbars, labels=['%.2f TB' % tb for tb in tera_bytes], padding=8, color='b', fontsize=14)
-ax.set_xlim(right=1600)
+ax.set_xlim(right=2800)
 
 plt.show()
