@@ -9,7 +9,7 @@
 import imagej
 import numpy as np
 
-ij = imagej.init("2.5.0", add_legacy=False)
+ij = imagej.init('/home/beams/FAST/Software/Fiji.app', mode='interactive')
 ij.ui().showUI()
 from jpype import JClass
 WindowManager = JClass('ij.WindowManager')
@@ -19,6 +19,3 @@ ij.ui().show('recon', ij.py.to_dataset(a))
 
 while True:
    pass
-
-# ij = imagej.init('/Applications/Fiji.app', mode=imagej.Mode.GUI)
-# ij.ui().showUI("swing")
