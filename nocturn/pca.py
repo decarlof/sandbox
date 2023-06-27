@@ -1,13 +1,10 @@
-''' Dumps a config file of the type readable by ConfigParser
-into a dictionary 
-Ref: http://docs.python.org/library/configparser.html
+''' Dumps a pca file into an excel spreasheet
 '''
 
 import os
 import sys
 import configparser
 import pandas as pd
-import json
 
 class GetDict:
     
