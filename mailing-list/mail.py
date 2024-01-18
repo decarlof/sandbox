@@ -1,4 +1,3 @@
-import csv
 import pandas
 
 def email_list_merge(file_name_1, file_name_2):
