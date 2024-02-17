@@ -58,7 +58,7 @@ def main(args):
     if len(sys.argv) == 1:
         print ('ERROR: Must provide the path to a run-file folder as the argument')
         print ('Example:')
-        print ('        python ge.py /Users/decarlo/conda/nocturn/data/FEG230530_413/')
+        print ('        python %s /data/file.h5'% sys.argv[0])
         sys.exit(1)
     else:
 
