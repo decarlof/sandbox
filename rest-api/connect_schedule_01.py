@@ -1,6 +1,7 @@
 import json
 import pathlib
 import requests
+import pprint
 
 from requests.auth import HTTPBasicAuth
 
@@ -31,7 +32,8 @@ def beamtime_request(scheduling_period, beamline_id="2-BM-A,B", credential_filen
 def main():
 
     response = beamtime_request("2020-1")  
-    print(response.json())
+    pprint.pprint(response.json(), compact=True)
+    print(response.json()[0]['proposal']['experimenters'][0]['email'])
     print(response.status_code)
 
 if __name__ == '__main__':
