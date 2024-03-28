@@ -1,26 +1,38 @@
 import json
+import pathlib
 import requests
 
-if __name__ == "__main__":
+from requests.auth import HTTPBasicAuth
 
-    headers = {
-      "accept": "*/*",
-      "authorization": "Basic enter-token-here"
-    }
 
-    res = requests.get('enter-url-here/sched-api/beamline/findAllBeamlines', headers=headers)
-    res_json = res.json()
-    
-    # print(res_json[0]['beamlineId'])
-    # print(res.status_code)
-   
-    # beamlines = [item['beamlineId'] for item in res_json]
-    # print(beamlines)
+def read_credentials(filename):
+    credentials = []
+    with open(filename, 'r') as file:
+        for line in file:
+            url, username, password = line.strip().split('|')  # Assuming | separated values: url|user|pwd
+            credentials.append((url, username, password))
+    return credentials
 
-    # beamlines = [item for item in res_json if item['beamlineId'] == '2-BM-A,B'] # '2-BM-A,B', '7-BM-B', '32-ID-B,C'
-    # print(beamlines)
 
-    # current credetials are not authorized to see 2-BM-A,B
-    res = requests.get('enter-url-here/sched-api/beamtimeRequests/findBeamtimeRequestsByRunAndBeamline/2023-1/2-BM-A%2CB', headers=headers)
-    res_json = res.json()
-    print(res_json)
+def beamtime_request(scheduling_period, beamline_id="2-BM-A,B", credential_filename='.scheduling_credentials'):
+    credentials = read_credentials(pathlib.PurePath(pathlib.Path.home(), credential_filename))
+    # print(credentials[0])
+
+    url               = credentials[0][0]
+    username          = credentials[0][1]
+    password          = credentials[0][2]
+    end_point         = "sched-api/beamtimeRequests/findBeamtimeRequestsByRunAndBeamline"
+    api_url = url + "/" + end_point + "/" + scheduling_period + "/" + beamline_id
+
+    response = requests.get(api_url, auth = HTTPBasicAuth(username, password))
+
+    return response
+
+def main():
+
+    response = beamtime_request("2020-1")  
+    print(response.json())
+    print(response.status_code)
+
+if __name__ == '__main__':
+    main()
