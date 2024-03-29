@@ -9,7 +9,7 @@ import datetime as dt
 from requests.auth import HTTPBasicAuth
 
 url = 'https://mis7.aps.anl.gov:7004'
-offset = -700     # offset : float +/- number of days from the current date. (test -600, -700)
+offset = -1500     # offset : float +/- number of days from the current date. (test: -1500, -600, -700, -7000)
 
 def fix_iso(s):
     """
@@ -63,6 +63,7 @@ def current_run(auth):
     """
     end_point         = "sched-api/run/getAllRuns"
     api_url = url + "/" + end_point 
+    print(api_url)
 
     reply = requests.get(api_url, auth=auth)
 
@@ -90,7 +91,7 @@ def beamtime_requests(run, auth, beamline_id="2-BM-A,B"):
     auth : Basic http authorization object
         Basic http authorization.
     beamline_id : string
-        Beamline ID e.g. "2-BM-A,B"
+        beamline ID as stored in the APS scheduling system, e.g. 2-BM-A,B or 7-BM-B or 32-ID-B,C
 
     Returns
     -------
@@ -98,12 +99,14 @@ def beamtime_requests(run, auth, beamline_id="2-BM-A,B"):
         dict-like object with proposals that have a beamtime request scheduled during the run.
         Returns None if there are no proposals or if auth does not have permission for beamline_id.
     """
-    end_point         = "sched-api/activity/findByRunNameAndBeamlineId"
-    api_url = url + "/" + end_point + "/" + run + "/" + beamline_id
+    if not run:
+        return None
+    else:
+        end_point="sched-api/activity/findByRunNameAndBeamlineId"
+        api_url = url + "/" + end_point + "/" + run + "/" + beamline_id
+        reply = requests.get(api_url, auth=auth)
 
-    reply = requests.get(api_url, auth=auth)
-
-    return reply.json()
+        return reply.json()
 
 def get_current_proposal(proposals):
     """
@@ -223,6 +226,11 @@ def print_current_experiment_info():
     if not proposals:
         print('No valid current experiment')
         return None
+    try:
+        log.error(proposals['message'])
+        return None
+    except:
+        pass
 
     proposal = get_current_proposal(proposals)
     if proposal != None:
