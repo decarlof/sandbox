@@ -1,8 +1,9 @@
 import json
 import pathlib
-import requests
 import pprint
-import pytz 
+import pytz
+import requests
+
 import datetime as dt
 
 from requests.auth import HTTPBasicAuth
@@ -19,6 +20,7 @@ def fix_iso(s):
     return s
 
 def read_credentials(filename):
+
     credentials = []
     with open(filename, 'r') as file:
         for line in file:
@@ -32,7 +34,6 @@ def authorize(credential_filename='.scheduling_credentials'):
 
     username          = credentials[0][0]
     password          = credentials[0][1]
-
     # print(username, password)
     auth = HTTPBasicAuth(username, password)
 
@@ -53,7 +54,6 @@ def current_run(auth):
     run : string
         Run name 2024-1.
     """
-
     end_point         = "sched-api/run/getAllRuns"
     api_url = url + "/" + end_point 
 
@@ -65,7 +65,6 @@ def current_run(auth):
     runs        = [item['runName'] for item in reply.json()]
     
     time_now = dt.datetime.now(pytz.timezone('America/Chicago')) + dt.timedelta(offset)
-
     for i in range(len(start_times)):
         prop_start = dt.datetime.fromisoformat(fix_iso(start_times[i]))
         prop_end   = dt.datetime.fromisoformat(fix_iso(end_times[i]))
@@ -93,7 +92,6 @@ def beamtime_requests(run, auth, beamline_id="2-BM-A,B"):
         dict-like object with proposals that have a beamtime request scheduled during the run.
         Returns None if there are no proposals or if auth is not granted permission for beamline_id.
     """
-
     end_point         = "sched-api/activity/findByRunNameAndBeamlineId"
     api_url = url + "/" + end_point + "/" + run + "/" + beamline_id
 
@@ -111,11 +109,9 @@ def get_current_proposal(proposals):
     dict-like object with information for currently active proposal
     """
     time_now = dt.datetime.now(pytz.timezone('America/Chicago')) + dt.timedelta(offset)
-    # print(time_now)
     for prop in proposals:
         prop_start = dt.datetime.fromisoformat(fix_iso(prop['startTime']))
         prop_end = dt.datetime.fromisoformat(fix_iso(prop['endTime']))
-        # print(prop_start, prop_end)
         if prop_start <= time_now and prop_end >= time_now:
             # pprint.pprint(prop, compact=True)
             return prop
@@ -142,7 +138,6 @@ def get_current_proposal_id(proposal):
     -------
     currently active proposal ID as an int
     """
-
     if not proposal:
         log.warning("No current valid proposal")
         return None
@@ -163,8 +158,7 @@ def get_current_users(proposal):
 
 def get_current_pi(proposal):
     """
-    Get information about the proposal PI0
-  .
+    Get information about the proposal PI.
     
     Returns
     -------
@@ -185,7 +179,6 @@ def get_current_emails(proposal, exclude_pi=True):
     Parameters
     ----------
     users : dictionary-like object containing user information
-    
     
     Returns
     -------
@@ -254,7 +247,6 @@ def print_current_experiment_info():
         print("\t\t{:s}".format(ue))
 
 def main():
-
     print_current_experiment_info()
 
 
