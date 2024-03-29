@@ -9,9 +9,12 @@ import datetime as dt
 from requests.auth import HTTPBasicAuth
 
 url = 'https://mis7.aps.anl.gov:7004'
-offset = -3997     # offset : float +/- number of days from the current date.
+offset = -700     # offset : float +/- number of days from the current date. (test -600, -700)
 
 def fix_iso(s):
+    """
+    This is a temporary fix until timezone is returned as -05:00 instead of -0500
+    """
     pos = len("2022-07-31T01:51:05-0400") - 2 # take off end "00"
     if len(s) == pos:                 # missing minutes completely
         s += ":00"
@@ -20,21 +23,25 @@ def fix_iso(s):
     return s
 
 def read_credentials(filename):
-
+    """
+    Read username and password from filename.
+    Must create filename in the user home directory with | separated values: user|pwd
+    """
     credentials = []
     with open(filename, 'r') as file:
         for line in file:
-            username, password = line.strip().split('|')  # Assuming | separated values: user|pwd
+            username, password = line.strip().split('|')  
             credentials.append((username, password))
     return credentials
 
-def authorize(credential_filename='.scheduling_credentials'):
-
-    credentials = read_credentials(pathlib.PurePath(pathlib.Path.home(), credential_filename))
+def authorize(filename='.scheduling_credentials'):
+    """
+    Get authorization using username and password contained in filename.
+    """
+    credentials = read_credentials(pathlib.PurePath(pathlib.Path.home(), filename))
 
     username          = credentials[0][0]
     password          = credentials[0][1]
-    # print(username, password)
     auth = HTTPBasicAuth(username, password)
 
     return auth
@@ -58,11 +65,10 @@ def current_run(auth):
     api_url = url + "/" + end_point 
 
     reply = requests.get(api_url, auth=auth)
-    # pprint.pprint(reply.json(), compact=True)
 
     start_times = [item['startTime'] for item in reply.json()]
-    end_times   = [item['endTime'] for item in reply.json()]
-    runs        = [item['runName'] for item in reply.json()]
+    end_times   = [item['endTime']   for item in reply.json()]
+    runs        = [item['runName']   for item in reply.json()]
     
     time_now = dt.datetime.now(pytz.timezone('America/Chicago')) + dt.timedelta(offset)
     for i in range(len(start_times)):
@@ -75,7 +81,7 @@ def current_run(auth):
 def beamtime_requests(run, auth, beamline_id="2-BM-A,B"):
     """
     Get a dictionary-like object with all proposals that have a beamtime request scheduled during the run.
-    If no proposal is active or auth is not granted permission for beamline_id, return None.
+    If no proposal is active or auth does not have permission for beamline_id, return None.
     
     Parameters
     ----------
@@ -90,7 +96,7 @@ def beamtime_requests(run, auth, beamline_id="2-BM-A,B"):
     -------
     proposals : list
         dict-like object with proposals that have a beamtime request scheduled during the run.
-        Returns None if there are no proposals or if auth is not granted permission for beamline_id.
+        Returns None if there are no proposals or if auth does not have permission for beamline_id.
     """
     end_point         = "sched-api/activity/findByRunNameAndBeamlineId"
     api_url = url + "/" + end_point + "/" + run + "/" + beamline_id
@@ -126,7 +132,7 @@ def get_current_proposal_title(proposal):
     str: title of the currently active proposal
     """
     if not proposal:
-        log.warning("No current valid proposal")
+        print("No current valid proposal")
         return None
     return proposal['beamtime']['proposal']['proposalTitle']
 
@@ -139,26 +145,26 @@ def get_current_proposal_id(proposal):
     currently active proposal ID as an int
     """
     if not proposal:
-        log.warning("No current valid proposal")
+        print("No current valid proposal")
         return None
     return proposal['beamtime']['proposal']['gupId']
 
 def get_current_users(proposal):
     """
-    Get users listed in the proposal
+    Get users listed in the currently active proposal.
     
     Returns
     -------
     users : dictionary-like object containing user information      
     """
     if not proposal:
-        log.warning("No current valid proposal")
+        print("No current valid proposal")
         return None
     return proposal['beamtime']['proposal']['experimenters']
 
 def get_current_pi(proposal):
     """
-    Get information about the proposal PI.
+    Get information about the currently active proposal PI.
     
     Returns
     -------
@@ -174,7 +180,7 @@ def get_current_pi(proposal):
 
 def get_current_emails(proposal, exclude_pi=True):
     """
-    Find user's emails listed in the proposal
+    Find user's emails listed in the currently active proposal
      
     Parameters
     ----------
@@ -204,7 +210,7 @@ def get_current_emails(proposal, exclude_pi=True):
 
 def print_current_experiment_info():
     """
-    Print the current experiment info running at beamline
+    Print the currently active proposal info running at beamline
      
     Returns
     -------
@@ -215,40 +221,42 @@ def print_current_experiment_info():
     proposals = beamtime_requests(run, auth)
     # pprint.pprint(proposals, compact=True)
     if not proposals:
-        log.warning('No valid current experiment')
+        print('No valid current experiment')
         return None
 
     proposal = get_current_proposal(proposals)
+    if proposal != None:
+        proposal_pi          = get_current_pi(proposal)
+        user_name            = proposal_pi['firstName']
+        user_last_name       = proposal_pi['lastName']   
+        user_affiliation     = proposal_pi['institution']
+        user_email           = proposal_pi['email']
+        user_badge           = proposal_pi['badge']
 
-    proposal_pi          = get_current_pi(proposal)
-    user_name            = proposal_pi['firstName']
-    user_last_name       = proposal_pi['lastName']   
-    user_affiliation     = proposal_pi['institution']
-    user_email           = proposal_pi['email']
-    user_badge           = proposal_pi['badge']
-
-    proposal_gup         = get_current_proposal_id(proposal)
-    proposal_title       = get_current_proposal_title(proposal)
-    proposal_user_emails = get_current_emails(proposal, False)
-    proposal_start       = dt.datetime.fromisoformat(fix_iso(proposal['startTime']))
-    proposal_end         = dt.datetime.fromisoformat(fix_iso(proposal['endTime']))
-   
-    print("\tRun: {0:s}".format(run))
-    print("\tPI Name: {0:s} {1:s}".format(user_name, user_last_name))
-    print("\tPI affiliation: ", user_affiliation)
-    print("\tPI e-mail: ", user_email)
-    print("\tPI badge: ", user_badge)   
-    print("\tProposal GUP: {0:d}".format(proposal_gup))
-    print("\tProposal Title: {0:s}".format(proposal_title))
-    print("\tStart time: ", proposal_start)
-    print("\tEnd Time: ", proposal_end)
-    print("\tUser email address: ")
-    for ue in proposal_user_emails:
-        print("\t\t{:s}".format(ue))
+        proposal_gup         = get_current_proposal_id(proposal)
+        proposal_title       = get_current_proposal_title(proposal)
+        proposal_user_emails = get_current_emails(proposal, False)
+        proposal_start       = dt.datetime.fromisoformat(fix_iso(proposal['startTime']))
+        proposal_end         = dt.datetime.fromisoformat(fix_iso(proposal['endTime']))
+       
+        print("\tRun: {0:s}".format(run))
+        print("\tPI Name: {0:s} {1:s}".format(user_name, user_last_name))
+        print("\tPI affiliation: ", user_affiliation)
+        print("\tPI e-mail: ", user_email)
+        print("\tPI badge: ", user_badge)   
+        print("\tProposal GUP: {0:d}".format(proposal_gup))
+        print("\tProposal Title: {0:s}".format(proposal_title))
+        print("\tStart time: ", proposal_start)
+        print("\tEnd Time: ", proposal_end)
+        print("\tUser email address: ")
+        for ue in proposal_user_emails:
+            print("\t\t{:s}".format(ue))
+    else:
+        time_now = dt.datetime.now(pytz.timezone('America/Chicago')) + dt.timedelta(offset)
+        print('No proposal run on %s during %s' % (time_now, run))
 
 def main():
     print_current_experiment_info()
-
 
 if __name__ == '__main__':
     main()
