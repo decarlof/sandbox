@@ -61,7 +61,7 @@ def current_run(auth):
     run : string
         Run name 2024-1.
     """
-    end_point         = "sched-api/run/getAllRuns"
+    end_point         = "sched-api/sched-api/run/getAllRuns"
     api_url = url + "/" + end_point 
     print(api_url)
 
@@ -102,7 +102,7 @@ def beamtime_requests(run, auth, beamline_id="2-BM-A,B"):
     if not run:
         return None
     else:
-        end_point="sched-api/activity/findByRunNameAndBeamlineId"
+        end_point="sched-api/sched-api/activity/findByRunNameAndBeamlineId"
         api_url = url + "/" + end_point + "/" + run + "/" + beamline_id
         reply = requests.get(api_url, auth=auth)
 

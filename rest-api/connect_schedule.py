@@ -8,7 +8,7 @@ if __name__ == "__main__":
       "authorization": "Basic enter-token-here"
     }
 
-    res = requests.get('enter-url-here/sched-api/beamline/findAllBeamlines', headers=headers)
+    res = requests.get('enter-url-here/sched-api/sched-api/beamline/findAllBeamlines', headers=headers)
     res_json = res.json()
     
     # print(res_json[0]['beamlineId'])
@@ -21,6 +21,6 @@ if __name__ == "__main__":
     # print(beamlines)
 
     # current credetials are not authorized to see 2-BM-A,B
-    res = requests.get('enter-url-here/sched-api/beamtimeRequests/findBeamtimeRequestsByRunAndBeamline/2023-1/2-BM-A%2CB', headers=headers)
+    res = requests.get('enter-url-here/sched-api/sched-api/beamtimeRequests/findBeamtimeRequestsByRunAndBeamline/2023-1/2-BM-A%2CB', headers=headers)
     res_json = res.json()
     print(res_json)
