@@ -1,0 +1,1 @@
+tomocupy recon_steps --reconstruction-type full --rotation-axis-auto auto --retrieve-phase-method paganin --retrieve-phase-alpha 0.0008 --energy 25.51 --propagation-distance 50 --pixel-size 0.92 --nproj-per-chunk 64 --nsino-per-chunk 16 --fbp-filter shepp --remove-stripe-method fw --file-name /data/aadekanmbi/Finfrock-2023-03/GB20230304_7_1a_155.h5
