@@ -4,9 +4,14 @@ import pathlib
 import time
 import globus_sdk
 import numpy as np
+import click
 
 import log
 
+
+@click.group()
+def cli():
+    pass
 
 
 def refresh_globus_token(globus_app_uuid):
@@ -82,6 +87,15 @@ def create_dir(directory,       # Subdirectory name under top to be created
         log.warning('*** Path %s already exists' % dir_path)
         return False
 
+def check_folder_exists(tc, ep_uuid, directory):
+    try:
+        tc.operation_ls(ep_uuid, path=directory)
+        return True
+    except globus_sdk.TransferAPIError as e:
+        if e.code == 'ClientError.NotFound':
+            return False
+        else:
+            raise e
 
 def share_dir(user_email,
               directory,       # Subdirectory name under top to be created
@@ -126,6 +140,7 @@ def share_dir(user_email,
 
     try: 
         response = tc.add_endpoint_acl_rule(ep_uuid, rule_data)
+        print(response)
         log.info('*** Path %s has been shared with %s' % (dir_path, user_email))
         return True
     except globus_sdk.TransferAPIError as e:
@@ -217,7 +232,12 @@ def main():
     directory = "test"
     create_dir(directory, ep_uuid, tc)
     # share the directory with the Globus user associated to an email address
+    directory = "test"
     share_dir("decarlof@gmail.com", directory, ep_uuid, ac, tc)
+    # if check_folder_exists(tc, ep_uuid, directory):
+    #     log.error('directory already exists')
+    # else:
+    #     share_dir("decarlof@gmail.com", directory, ep_uuid, ac, tc)
 
 
 if __name__ == '__main__':
