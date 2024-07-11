@@ -97,6 +97,14 @@ def check_folder_exists(tc, ep_uuid, directory):
         else:
             raise e
 
+def get_user_id(ac, user_email):
+    # Get user id from user email
+    r = ac.get_identities(usernames=user_email)
+    user_id = r['identities'][0]['id']
+
+    return user_id
+
+
 def share_dir(user_email,
               directory,       # Subdirectory name under top to be created
               ep_uuid,         # Endpoint UUID
@@ -122,9 +130,10 @@ def share_dir(user_email,
     # response = ac.get("/v2/api/identities?usernames="+user_email)
 
     # Get user id from user email
-    r = ac.get_identities(usernames=user_email)
-    user_id = r['identities'][0]['id']
-    # print(r, user_id)
+    # r = ac.get_identities(usernames=user_email)
+    # user_id = r['identities'][0]['id']
+    # # print(r, user_id)
+    user_id = get_user_id(ac, user_email)
 
     dir_path = '/~/' + directory + '/'
     # Set access control and notify user
@@ -140,7 +149,7 @@ def share_dir(user_email,
 
     try: 
         response = tc.add_endpoint_acl_rule(ep_uuid, rule_data)
-        print(response)
+        # print(response)
         log.info('*** Path %s has been shared with %s' % (dir_path, user_email))
         return True
     except globus_sdk.TransferAPIError as e:
@@ -233,11 +242,12 @@ def main():
     create_dir(directory, ep_uuid, tc)
     # share the directory with the Globus user associated to an email address
     directory = "test"
-    share_dir("decarlof@gmail.com", directory, ep_uuid, ac, tc)
-    # if check_folder_exists(tc, ep_uuid, directory):
-    #     log.error('directory already exists')
-    # else:
-    #     share_dir("decarlof@gmail.com", directory, ep_uuid, ac, tc)
+    user_email = "decarlof@gmail.com"
+    share_dir(user_email, directory, ep_uuid, ac, tc)
+    user_id = get_user_id(ac, user_email)
+
+    url = 'https://app.globus.org/file-manager?&origin_id='+ep_uuid+'&origin_path=/~/'+directory+'/&add_identity='+user_id
+    log.warning(url)
 
 
 if __name__ == '__main__':
