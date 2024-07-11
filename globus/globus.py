@@ -99,7 +99,7 @@ def check_folder_exists(tc, ep_uuid, directory):
 
 def get_user_id(ac, user_email):
     # Get user id from user email
-    r = ac.get_identities(usernames=user_email)
+    r = ac.get_identities(usernames=user_email, provision=True)
     user_id = r['identities'][0]['id']
 
     return user_id
@@ -245,6 +245,7 @@ def main():
     user_email = "decarlof@gmail.com"
     share_dir(user_email, directory, ep_uuid, ac, tc)
     user_id = get_user_id(ac, user_email)
+    print(user_id)
 
     url = 'https://app.globus.org/file-manager?&origin_id='+ep_uuid+'&origin_path=/~/'+directory+'/&add_identity='+user_id
     log.warning(url)
