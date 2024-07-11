@@ -5,6 +5,7 @@ import time
 import globus_sdk
 import numpy as np
 import click
+import subprocess
 
 import log
 
@@ -194,7 +195,7 @@ def create_clients(globus_app_uuid):
       
     """
 
-    globus_token_file=os.path.join(str(pathlib.Path.home()), 'token.npy')
+    # globus_token_file=os.path.join(str(pathlib.Path.home()), 'token.npy')
     token_response = refresh_globus_token(globus_app_uuid)
     # let's get stuff for the Globus Transfer service
     globus_transfer_data = token_response.by_resource_server['transfer.api.globus.org']
@@ -216,7 +217,7 @@ def create_clients(globus_app_uuid):
     ac = globus_sdk.AuthClient(authorizer=authorizer)
     tc = globus_sdk.TransferClient(authorizer=authorizer)
 
-    return ac, tc
+    return ac, tc, transfer_at
 
 
 def main():
@@ -232,24 +233,45 @@ def main():
     # The UUID of alcf#dtn_eagle is 05d2c76a-e867-4f67-aa57-76edeb0beda0
     alcf_eagle_globus_server_uuid = '05d2c76a-e867-4f67-aa57-76edeb0beda0'
     # Create a client
-    ac, tc = create_clients(globus_app_uuid)
+    ac, tc, transfer_at= create_clients(globus_app_uuid)
     # Ask the Globus server to show all end points it has access to
     show_endpoints(tc)
     # Select one end points e.g. 2-BM tomography data = [635c3ecb-f073-42ef-8278-471ed99bfd6e]
-    ep_uuid = '635c3ecb-f073-42ef-8278-471ed99bfd6e'
+    # ep_uuid = '635c3ecb-f073-42ef-8278-471ed99bfd6e' 
+    # Select one end points e.g. neuroglancer = [b0d438a0-17a1-4ec3-acc0-141327c0523e]    
+    ep_uuid = 'b0d438a0-17a1-4ec3-acc0-141327c0523e'
     # create a new directory on the selected end point
     directory = "test"
     create_dir(directory, ep_uuid, tc)
     # share the directory with the Globus user associated to an email address
     directory = "test"
-    user_email = "decarlof@gmail.com"
+    user_email = "vnikitin90@gmail.com"
     share_dir(user_email, directory, ep_uuid, ac, tc)
     user_id = get_user_id(ac, user_email)
-    print(user_id)
-
+    file_name =  'test.tiff'
+    wget_address = 'https://' + tc.get_endpoint(ep_uuid)['tlsftp_server'][9:-4] + '/' + directory + '/' + file_name
+    log.warning('wget download address: %s' % wget_address)
     url = 'https://app.globus.org/file-manager?&origin_id='+ep_uuid+'&origin_path=/~/'+directory+'/&add_identity='+user_id
-    log.warning(url)
+    log.warning('url folder address: %s' % url)
 
+    # # URL of the file to download from Globus
+    # url = wget_address
+    # # Local filename to save the file
+    # output_filename = "downloaded_file.zip"
+    # # Globus access token (obtained from the previous step)
+    # token = transfer_at
+
+    # try:
+    #     # Using subprocess to call wget with a token
+    #     subprocess.run([
+    #         "wget", 
+    #         "--header", f"Authorization: Bearer {token}", 
+    #         wget_address, 
+    #         "-O", output_filename
+    #     ], check=True)
+    #     print(f"File downloaded successfully and saved as {output_filename}")
+    # except subprocess.CalledProcessError as e:
+    #     print(f"An error occurred: {e}")
 
 if __name__ == '__main__':
     main()
