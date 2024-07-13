@@ -17,7 +17,9 @@ def cli():
 
 def refresh_globus_token(globus_app_uuid):
     """
-    Create and save a globus token. The token is valid for 48h.
+    Verify that existing Globus token exists and it is still valid, 
+    if not creates & saves or refresh & save the globus token. 
+    The token is valid for 48h.
 
     Parameters
     ----------
@@ -63,8 +65,7 @@ def refresh_globus_token(globus_app_uuid):
         log.warning('Please go to this URL and login: {0}'.format(client.oauth2_get_authorize_url()))
 
         get_input = getattr(__builtins__, 'raw_input', input)
-        auth_code = get_input('Please enter the code you get after login here: ').strip() # pythn 3
-        # auth_code = raw_input('Please enter the code you get after login here: ').strip() # python 2.7
+        auth_code = get_input('Please enter the code you get after login here: ').strip()
         token_response = client.oauth2_exchange_code_for_tokens(auth_code)
         # --------------------------------------------
         np.save(globus_token_file, token_response) 
@@ -72,23 +73,65 @@ def refresh_globus_token(globus_app_uuid):
     return token_response
 
 
+def create_clients(globus_app_uuid):
+    """
+    Create authorize and transfer clients
+
+    Parameters
+    ----------
+    globus_app_id : App UUID 
+
+    Returns
+    -------
+    ac : Authorize client
+    tc : Transfer client
+      
+    """
+
+    token_response = refresh_globus_token(globus_app_uuid)
+    # let's get stuff for the Globus Transfer service
+    globus_transfer_data = token_response.by_resource_server['transfer.api.globus.org']
+    # the refresh token and access token, often abbr. as RT and AT
+    transfer_rt = globus_transfer_data['refresh_token']
+    transfer_at = globus_transfer_data['access_token']
+    expires_at_s = globus_transfer_data['expires_at_seconds']
+
+    globus_token_life = expires_at_s - time.time()
+    log.warning("Globus access token will expire in %2.2f hours", (globus_token_life/3600))
+
+    client = globus_sdk.NativeAppAuthClient(globus_app_uuid)
+    client.oauth2_start_flow(refresh_tokens=True)
+    # Now we've got the data we need we set the authorizer
+    authorizer = globus_sdk.RefreshTokenAuthorizer(transfer_rt, client, access_token=transfer_at, expires_at=expires_at_s)
+
+    ac = globus_sdk.AuthClient(authorizer=authorizer)
+    tc = globus_sdk.TransferClient(authorizer=authorizer)
+
+    return ac, tc
+
+
 def create_dir(directory,       # Subdirectory name under top to be created
-               ep_uuid,         # Endpoint UUID
-               tc):             # Transfer client
+               globus_app_uuid, # Globus App / Client UUID
+               ep_uuid):        # Endpoint UUID
 
     dir_path = '/~/' + directory + '/'
+    ac, tc = create_clients(globus_app_uuid)
     try:
         response = tc.operation_mkdir(ep_uuid, path=dir_path)
         log.info('*** Created folder: %s' % dir_path)
         return True
     except globus_sdk.TransferAPIError as e:
-        log.error(f"Transfer API Error: {e.code} - {e.message}")
+        log.warning(f"Transfer API Error: {e.code} - {e.message}")
         # log.error(f"Details: {e.raw_text}")
+        return True
     except:
-        log.warning('*** Path %s already exists' % dir_path)
+        log.error('*** Unknow error')
         return False
 
-def check_folder_exists(tc, ep_uuid, directory):
+def check_folder_exists(ep_uuid, directory):
+
+    ac, tc = create_clients(globus_app_uuid)
+
     try:
         tc.operation_ls(ep_uuid, path=directory)
         return True
@@ -98,7 +141,10 @@ def check_folder_exists(tc, ep_uuid, directory):
         else:
             raise e
 
-def get_user_id(ac, user_email):
+def get_user_id(globus_app_uuid, user_email):
+
+    ac, tc = create_clients(globus_app_uuid)
+
     # Get user id from user email
     r = ac.get_identities(usernames=user_email, provision=True)
     user_id = r['identities'][0]['id']
@@ -106,11 +152,12 @@ def get_user_id(ac, user_email):
     return user_id
 
 
-def share_dir(user_email,
-              directory,       # Subdirectory name under top to be created
-              ep_uuid,         # Endpoint UUID
-              ac,              # Access client
-              tc):             # Transfer client
+def share_dir(directory,        # Subdirectory name under top to be created
+              user_email,
+              globus_app_uuid,
+              ep_uuid           # Endpoint UUID
+              ):         
+
 
     """
     Share an existing globus directory with a globus user. The user receives an email with the link to the folder.
@@ -126,15 +173,8 @@ def share_dir(user_email,
 
     """
 
-    # This part is to handle the case a user does not have yet a globus ID, it is not working yet.
-    # # Query to Auth Client to verify if a globus user ID is associated to the user email address, if not one is generated
-    # response = ac.get("/v2/api/identities?usernames="+user_email)
-
-    # Get user id from user email
-    # r = ac.get_identities(usernames=user_email)
-    # user_id = r['identities'][0]['id']
-    # # print(r, user_id)
-    user_id = get_user_id(ac, user_email)
+    ac, tc = create_clients(globus_app_uuid)
+    user_id = get_user_id(globus_app_uuid, user_email)
 
     dir_path = '/~/' + directory + '/'
     # Set access control and notify user
@@ -161,7 +201,7 @@ def share_dir(user_email,
         return False
 
 
-def show_endpoints(tc):
+def show_endpoints(globus_app_uuid):
     """
     Show all end points
 
@@ -171,107 +211,102 @@ def show_endpoints(tc):
 
     """
 
+    ac, tc = create_clients(globus_app_uuid)
+
     log.info('Show all endpoints shared and owned by my globus user credentials')
     log.info("*** Endpoints shared with me:")
     for ep in tc.endpoint_search(filter_scope="shared-with-me"):
         log.info("*** *** [{}] {}".format(ep["id"], ep["display_name"]))
-    log.info("*** Endpoints owned with me::")
+    log.info("*** Endpoints owned with me:")
     for ep in tc.endpoint_search(filter_scope="my-endpoints"):
         log.info("*** *** [{}] {}".format(ep["id"], ep["display_name"]))
+    log.info("*** Endpoints shared by me:")
 
+    endpoints = {}
+    for ep in tc.endpoint_search(filter_scope="shared-by-me"):
+        log.info("*** *** [{}] {}".format(ep["id"], ep["display_name"]))
+        endpoints[ep['display_name']] = ep['id']
 
-def create_clients(globus_app_uuid):
-    """
-    Create authorize and transfer clients
+    return endpoints
 
-    Parameters
-    ----------
-    globus_app_id : App UUID 
+def create_folder_link(directory, globus_app_uuid, ep_uuid):
 
-    Returns
-    -------
-    ac : Authorize client
-    tc : Transfer client
-      
-    """
+    ac, tc = create_clients(globus_app_uuid)
 
-    # globus_token_file=os.path.join(str(pathlib.Path.home()), 'token.npy')
-    token_response = refresh_globus_token(globus_app_uuid)
-    # let's get stuff for the Globus Transfer service
-    globus_transfer_data = token_response.by_resource_server['transfer.api.globus.org']
-    # the refresh token and access token, often abbr. as RT and AT
-    transfer_rt = globus_transfer_data['refresh_token']
-    transfer_at = globus_transfer_data['access_token']
-    expires_at_s = globus_transfer_data['expires_at_seconds']
+    url = 'https://app.globus.org/file-manager?&origin_id='+ep_uuid+'&origin_path=/~/'+directory #+'/&add_identity='+user_id
 
-    globus_token_life = expires_at_s - time.time()
-    log.warning("Globus access token will expire in %2.2f hours", (globus_token_life/3600))
-    globus_app_id = globus_app_uuid
-    client = globus_sdk.NativeAppAuthClient(globus_app_id)
-    client.oauth2_start_flow(refresh_tokens=True)
-    # Now we've got the data we need, but what do we do?
-    # That "GlobusAuthorizer" from before is about to come to the rescue
-    authorizer = globus_sdk.RefreshTokenAuthorizer(transfer_rt, client, access_token=transfer_at, expires_at=expires_at_s)
-    # and try using `tc` to make TransferClient calls. Everything should just
-    # work -- for days and days, months and months, even years
-    ac = globus_sdk.AuthClient(authorizer=authorizer)
-    tc = globus_sdk.TransferClient(authorizer=authorizer)
+    return url
 
-    return ac, tc, transfer_at
+def create_file_links(directory, globus_app_uuid, ep_uuid):
+
+    wget_urls = []
+
+    ac, tc = create_clients(globus_app_uuid)
+    files  = find_files(directory, globus_app_uuid, ep_uuid)
+
+    for file_name in files:
+        wget_urls.append('https://' + tc.get_endpoint(ep_uuid)['tlsftp_server'][9:-4] + '/' + directory + '/' + file_name)
+
+    return wget_urls
+
+def find_endpoint(ep_name, globus_app_uuid):
+    ep_uuid = None
+
+    # Ask the Globus server to show all end points it has access to
+    end_points = show_endpoints(globus_app_uuid)
+
+    if ep_name in end_points:
+        ep_uuid = end_points[ep_name]
+    else:
+        log.error('%s endpoint does not exists' % ep_name)
+        log.error('Select one of this endpoints:')
+        for key, value in end_points.items():
+            log.error('*** *** %s' % key)
+
+    return ep_uuid
+    
+def find_files(directory, globus_app_uuid, ep_uuid):
+
+    ac, tc = create_clients(globus_app_uuid)
+    response = tc.operation_ls(ep_uuid, path=directory)
+    
+    files = []
+    for item in response['DATA']:
+        log.info('directory %s contains %s: %s' % (directory, item['type'], item['name']))
+        if item['type'] == 'file':
+            files.append(item['name'])
+
+    return files
 
 
 def main():
 
-    # this is just to print nice logger messages
+    # This is just to print nice logger messages
     log.setup_custom_logger()
 
     # Create a client or "app" definition registered with Globus and get its uuid 
     # see https://globus-sdk-python.readthedocs.io/en/stable/tutorial.html#tutorial-step1
     globus_app_uuid = '2f1fd715-ee09-43f9-9b48-1f06810bcc70'
-    # Set the Globus server UUID. To find the UUID of alcf#dtn_eagle go to Globus and open
-    # the server overview page at https://app.globus.org/file-manager/collections/05d2c76a-e867-4f67-aa57-76edeb0beda0/overview
-    # The UUID of alcf#dtn_eagle is 05d2c76a-e867-4f67-aa57-76edeb0beda0
-    alcf_eagle_globus_server_uuid = '05d2c76a-e867-4f67-aa57-76edeb0beda0'
-    # Create a client
-    ac, tc, transfer_at= create_clients(globus_app_uuid)
-    # Ask the Globus server to show all end points it has access to
-    show_endpoints(tc)
-    # Select one end points e.g. 2-BM tomography data = [635c3ecb-f073-42ef-8278-471ed99bfd6e]
-    # ep_uuid = '635c3ecb-f073-42ef-8278-471ed99bfd6e' 
-    # Select one end points e.g. neuroglancer = [b0d438a0-17a1-4ec3-acc0-141327c0523e]    
-    ep_uuid = 'b0d438a0-17a1-4ec3-acc0-141327c0523e'
-    # create a new directory on the selected end point
-    directory = "test"
-    create_dir(directory, ep_uuid, tc)
-    # share the directory with the Globus user associated to an email address
-    directory = "test"
-    user_email = "vnikitin90@gmail.com"
-    share_dir(user_email, directory, ep_uuid, ac, tc)
-    user_id = get_user_id(ac, user_email)
-    file_name =  'test.tiff'
-    wget_address = 'https://' + tc.get_endpoint(ep_uuid)['tlsftp_server'][9:-4] + '/' + directory + '/' + file_name
-    log.warning('wget download address: %s' % wget_address)
-    url = 'https://app.globus.org/file-manager?&origin_id='+ep_uuid+'&origin_path=/~/'+directory+'/&add_identity='+user_id
-    log.warning('url folder address: %s' % url)
 
-    # # URL of the file to download from Globus
-    # url = wget_address
-    # # Local filename to save the file
-    # output_filename = "downloaded_file.zip"
-    # # Globus access token (obtained from the previous step)
-    # token = transfer_at
+    ep_name = 'DARPA scratch'
+    ep_uuid = find_endpoint(ep_name, globus_app_uuid)
 
-    # try:
-    #     # Using subprocess to call wget with a token
-    #     subprocess.run([
-    #         "wget", 
-    #         "--header", f"Authorization: Bearer {token}", 
-    #         wget_address, 
-    #         "-O", output_filename
-    #     ], check=True)
-    #     print(f"File downloaded successfully and saved as {output_filename}")
-    # except subprocess.CalledProcessError as e:
-    #     print(f"An error occurred: {e}")
+    if ep_uuid != None:
+        directory  = "test2"
+        user_email = "decarlof@gmail.com"
+
+        # create a new directory on the selected end point
+        if create_dir(directory, globus_app_uuid, ep_uuid):
+            # share the directory with the Globus user associated to an email address
+            share_dir(directory, user_email, globus_app_uuid, ep_uuid)
+
+        url      = create_folder_link(directory, globus_app_uuid, ep_uuid)
+        log.warning('url folder address: %s' % url)
+
+        wget_urls = create_file_links(directory, globus_app_uuid, ep_uuid)
+        for wget_url in wget_urls:
+            log.info('wget download address: %s' % wget_url)
+
 
 if __name__ == '__main__':
     main()
