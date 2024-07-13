@@ -201,7 +201,7 @@ def share_dir(directory,        # Subdirectory name under top to be created
         return False
 
 
-def show_endpoints(globus_app_uuid):
+def find_endpoints(globus_app_uuid, show=False):
     """
     Show all end points
 
@@ -213,19 +213,22 @@ def show_endpoints(globus_app_uuid):
 
     ac, tc = create_clients(globus_app_uuid)
 
-    log.info('Show all endpoints shared and owned by my globus user credentials')
-    log.info("*** Endpoints shared with me:")
-    for ep in tc.endpoint_search(filter_scope="shared-with-me"):
-        log.info("*** *** [{}] {}".format(ep["id"], ep["display_name"]))
-    log.info("*** Endpoints owned with me:")
-    for ep in tc.endpoint_search(filter_scope="my-endpoints"):
-        log.info("*** *** [{}] {}".format(ep["id"], ep["display_name"]))
-    log.info("*** Endpoints shared by me:")
-
-    endpoints = {}
-    for ep in tc.endpoint_search(filter_scope="shared-by-me"):
-        log.info("*** *** [{}] {}".format(ep["id"], ep["display_name"]))
-        endpoints[ep['display_name']] = ep['id']
+    if show:
+        log.info('Show all endpoints shared and owned by my globus user credentials')
+        log.info("*** Endpoints shared with me:")
+        for ep in tc.endpoint_search(filter_scope="shared-with-me"):
+            log.info("*** *** [{}] {}".format(ep["id"], ep["display_name"]))
+        log.info("*** Endpoints owned with me:")
+        for ep in tc.endpoint_search(filter_scope="my-endpoints"):
+            log.info("*** *** [{}] {}".format(ep["id"], ep["display_name"]))
+        log.info("*** Endpoints shared by me:")
+        for ep in tc.endpoint_search(filter_scope="shared-by-me"):
+            log.info("*** *** [{}] {}".format(ep["id"], ep["display_name"]))
+            endpoints[ep['display_name']] = ep['id']
+    else:
+        endpoints = {}
+        for ep in tc.endpoint_search(filter_scope="shared-by-me"):
+            endpoints[ep['display_name']] = ep['id']
 
     return endpoints
 
@@ -249,11 +252,11 @@ def create_file_links(directory, globus_app_uuid, ep_uuid):
 
     return wget_urls
 
-def find_endpoint(ep_name, globus_app_uuid):
+def find_endpoint_uuid(ep_name, globus_app_uuid):
     ep_uuid = None
 
     # Ask the Globus server to show all end points it has access to
-    end_points = show_endpoints(globus_app_uuid)
+    end_points = find_endpoints(globus_app_uuid)
 
     if ep_name in end_points:
         ep_uuid = end_points[ep_name]
@@ -289,7 +292,7 @@ def main():
     globus_app_uuid = '2f1fd715-ee09-43f9-9b48-1f06810bcc70'
 
     ep_name = 'DARPA scratch'
-    ep_uuid = find_endpoint(ep_name, globus_app_uuid)
+    ep_uuid = find_endpoint_uuid(ep_name, globus_app_uuid)
 
     if ep_uuid != None:
         directory  = "test2"
