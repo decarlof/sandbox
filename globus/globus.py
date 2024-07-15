@@ -176,7 +176,7 @@ def share_dir(directory,        # Subdirectory name under top to be created
     ac, tc = create_clients(globus_app_uuid)
     user_id = get_user_id(globus_app_uuid, user_email)
 
-    dir_path = '/~/' + directory + '/'
+    dir_path = '/' + directory + '/'
     # Set access control and notify user
     rule_data = {
       'DATA_TYPE': 'access',
@@ -240,17 +240,20 @@ def create_folder_link(directory, globus_app_uuid, ep_uuid):
 
     return url
 
-def create_file_links(directory, globus_app_uuid, ep_uuid):
+def create_links(directory, globus_app_uuid, ep_uuid):
 
-    wget_urls = []
+    file_links   = []
+    folder_links = []
 
     ac, tc = create_clients(globus_app_uuid)
-    files  = find_files(directory, globus_app_uuid, ep_uuid)
+    files, folders  = find_files(directory, globus_app_uuid, ep_uuid)
 
     for file_name in files:
-        wget_urls.append('https://' + tc.get_endpoint(ep_uuid)['tlsftp_server'][9:-4] + '/' + directory + '/' + file_name)
+        file_links.append('https://' + tc.get_endpoint(ep_uuid)['tlsftp_server'][9:-4] + '/' + directory + '/' + file_name)
+    for folder in folders:
+        folder_links.append('https://app.globus.org/file-manager?&origin_id=' + ep_uuid + '&origin_path=/' + directory+ '/' + folder) #+'/&add_identity='+user_id)
 
-    return wget_urls
+    return file_links, folder_links
 
 def find_endpoint_uuid(ep_name, globus_app_uuid):
     ep_uuid = None
@@ -273,13 +276,16 @@ def find_files(directory, globus_app_uuid, ep_uuid):
     ac, tc = create_clients(globus_app_uuid)
     response = tc.operation_ls(ep_uuid, path=directory)
     
-    files = []
+    files   = []
+    folders = []
     for item in response['DATA']:
         log.info('directory %s contains %s: %s' % (directory, item['type'], item['name']))
         if item['type'] == 'file':
             files.append(item['name'])
+        if item['type'] == 'dir':
+            folders.append(item['name'])
 
-    return files
+    return files, folders
 
 
 def main():
@@ -296,7 +302,7 @@ def main():
 
     if ep_uuid != None:
         directory  = "test2"
-        user_email = "decarlof@gmail.com"
+        user_email = "decarlof@globusid.org"
 
         # create a new directory on the selected end point
         if create_dir(directory, globus_app_uuid, ep_uuid):
@@ -306,9 +312,11 @@ def main():
         url      = create_folder_link(directory, globus_app_uuid, ep_uuid)
         log.warning('url folder address: %s' % url)
 
-        wget_urls = create_file_links(directory, globus_app_uuid, ep_uuid)
-        for wget_url in wget_urls:
-            log.info('wget download address: %s' % wget_url)
+        file_links, folder_links = create_links(directory, globus_app_uuid, ep_uuid)
+        for file_link in file_links:
+            log.info('file download link: %s' % file_link)
+        for folder_link in folder_links:
+            log.info('folder download link: %s' % folder_link)
 
 
 if __name__ == '__main__':
