@@ -1,29 +1,5 @@
 import json
 
-
-    ts_pvs['RotationStart']         = PV(tomoscan_prefix + 'RotationStart')  
-    ts_pvs['RotationStep']          = PV(tomoscan_prefix + 'RotationStep')  
-    ts_pvs['NumAngles']             = PV(tomoscan_prefix + 'NumAngles')  
-    ts_pvs['ReturnRotation']        = PV(tomoscan_prefix + 'ReturnRotation')  
-    ts_pvs['NumDarkFields']         = PV(tomoscan_prefix + 'NumDarkFields')  
-    ts_pvs['DarkFieldMode']         = PV(tomoscan_prefix + 'DarkFieldMode')  
-    ts_pvs['DarkFieldValue']        = PV(tomoscan_prefix + 'DarkFieldValue')  
-    ts_pvs['NumFlatFields']         = PV(tomoscan_prefix + 'NumFlatFields')
-    ts_pvs['FlatFieldAxis']         = PV(tomoscan_prefix + 'FlatFieldAxis')
-    ts_pvs['FlatFieldMode']         = PV(tomoscan_prefix + 'FlatFieldMode')
-    ts_pvs['FlatFieldValue']        = PV(tomoscan_prefix + 'FlatFieldValue')  
-    ts_pvs['FlatExposureTime']      = PV(tomoscan_prefix + 'FlatExposureTime')  
-    ts_pvs['DifferentFlatExposure'] = PV(tomoscan_prefix + 'DifferentFlatExposure')
-    ts_pvs['SampleInX']             = PV(tomoscan_prefix + 'SampleInX')
-    ts_pvs['SampleInY']             = PV(tomoscan_prefix + 'SampleInY')
-    ts_pvs['SampleOutAngleEnable']  = PV(tomoscan_prefix + 'SampleOutAngleEnable') 
-    ts_pvs['SampleOutAngle']        = PV(tomoscan_prefix + 'SampleOutAngle')  
-    ts_pvs['SampleOutX']            = PV(tomoscan_prefix + 'SampleOutX')  
-    ts_pvs['SampleOutY']            = PV(tomoscan_prefix + 'SampleOutY')  
-    ts_pvs['ScanType']              = PV(tomoscan_prefix + 'ScanType')
-    ts_pvs['FlipStitch']            = PV(tomoscan_prefix + 'FlipStitch')
-    ts_pvs['ExposureTime']          = PV(tomoscan_prefix + 'ExposureTime')  
-
 scan_dict = {
             '00' :  {'SampleX' : 0.0,  'SampleY' : 1.0,  'RotationStart' : 0, 'RotationStep' : 0.12,  'NumAngles' : 1500, 'ReturnRotation' : 'No', 'NumDarkFields' : 20, 'DarkFieldMode' : 'Start', 'DarkFieldValue': 0, 'NumFlatFields' : 20, 'FlatFieldValue' : 0, 'FlatExposureTime' : 0.1, 'DifferentFlatExposure' : 'No', 'FlatFieldMode' : 'Start', 'FlatFieldAxis' : 'X', 'SampleInX' : 0, 'SampleOutX' : 1, 'SampleInY' : 0, 'SampleOutY' : 1, 'SampleOutAngle' : 90, 'SampleOutAngleEnable' : 'No', 'ScanType' : 'Single', 'FlipStitch' : 'No', 'ExposureTime' : 0.01 },
             '01' :  {'SampleX' : 0.1,  'SampleY' : 0.9,  'RotationStart' : 0, 'RotationStep' : 0.12,  'NumAngles' : 1500, 'ReturnRotation' : 'No', 'NumDarkFields' : 20, 'DarkFieldMode' : 'Start', 'DarkFieldValue': 0, 'NumFlatFields' : 20, 'FlatFieldValue' : 0, 'FlatExposureTime' : 0.1, 'DifferentFlatExposure' : 'No', 'FlatFieldMode' : 'Start', 'FlatFieldAxis' : 'X', 'SampleInX' : 0, 'SampleOutX' : 1, 'SampleInY' : 0, 'SampleOutY' : 1, 'SampleOutAngle' : 90, 'SampleOutAngleEnable' : 'No', 'ScanType' : 'Single', 'FlipStitch' : 'No', 'ExposureTime' : 0.01 },
