@@ -1,7 +1,6 @@
 import json
 import pathlib
 import pprint
-import pytz
 import requests
 
 import datetime as dt
@@ -71,7 +70,8 @@ def current_run(auth):
     end_times   = [item['endTime']   for item in reply.json()]
     runs        = [item['runName']   for item in reply.json()]
     
-    time_now = dt.datetime.now(pytz.timezone('America/Chicago')) + dt.timedelta(offset)
+    time_now = dt.datetime.now().astimezone() + dt.timedelta(offset) + dt.timedelta(offset)
+
     for i in range(len(start_times)):
         prop_start = dt.datetime.fromisoformat(fix_iso(start_times[i]))
         prop_end   = dt.datetime.fromisoformat(fix_iso(end_times[i]))
@@ -117,7 +117,7 @@ def get_current_proposal(proposals):
     -------
     dict-like object with information for currently active proposal
     """
-    time_now = dt.datetime.now(pytz.timezone('America/Chicago')) + dt.timedelta(offset)
+    time_now = dt.datetime.now().astimezone() + dt.timedelta(offset)
     for prop in proposals:
         prop_start = dt.datetime.fromisoformat(fix_iso(prop['startTime']))
         prop_end = dt.datetime.fromisoformat(fix_iso(prop['endTime']))
@@ -260,7 +260,8 @@ def print_current_experiment_info():
         for ue in proposal_user_emails:
             print("\t\t{:s}".format(ue))
     else:
-        time_now = dt.datetime.now(pytz.timezone('America/Chicago')) + dt.timedelta(offset)
+        time_now = dt.datetime.now().astimezone() + dt.timedelta(offset)
+
         print('No proposal run on %s during %s' % (time_now, run))
 
 def main():
