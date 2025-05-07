@@ -2,7 +2,7 @@ import dxfile.dxtomo as dx
 import numpy as np
 
 n_proj = 512 # enter the correct number of projections
-fname = enter full path to the hdf file
+fname = '/local/dataraid/test.h5'
 
 # Theta
 theta_step = np.pi / n_proj
