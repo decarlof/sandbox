@@ -13,24 +13,24 @@ class DriveSnippets(object):
         self.service = service
         self.credentials = credentials
 
-    def upload_file(self, drive_service, filepath, mimetype, drive_filename, parent_folder_id=None):
+    def upload_file(self, filepath, mimetype, drive_filename, parent_folder_id=None):
         file_metadata = {'name': drive_filename}
         if parent_folder_id:
             file_metadata['parents'] = [parent_folder_id]
 
         media = MediaFileUpload(filepath, mimetype=mimetype)
-        file = drive_service.files().create(
+        file = self.service.files().create(
             body=file_metadata,
             media_body=media,
             fields='id'
         ).execute()
-        print('File uploaded. File ID:', file.get('id'))
+        print('Google file uploaded. Google file ID:', file.get('id'))
         
-    def find_file_id(self, drive_service, filename, parent_folder_id=None):
+    def find_file_id(self, filename, parent_folder_id=None):
         query = f"name='{filename}'"
         if parent_folder_id:
             query += f" and '{parent_folder_id}' in parents"
-        results = drive_service.files().list(
+        results = self.service.files().list(
             q=query,
             spaces='drive',
             fields='files(id, name)',
@@ -41,29 +41,29 @@ class DriveSnippets(object):
             return files[0]['id']
         return None
 
-    def upload_or_update_file(self, drive_service, filepath, mimetype, drive_filename, parent_folder_id=None):
-        file_id = self.find_file_id(drive_service, drive_filename, parent_folder_id)
+    def upload_or_update_file(self, filepath, mimetype, drive_filename, parent_folder_id=None):
+        file_id = self.find_file_id(drive_filename, parent_folder_id)
         media = MediaFileUpload(filepath, mimetype=mimetype)
 
         if file_id:
-            print(f"File '{drive_filename}' exists (ID: {file_id}), updating...")
-            updated_file = drive_service.files().update(
+            print(f"Google file '{drive_filename}' exists (ID: {file_id}), updating...")
+            updated_file = self.service.files().update(
                 fileId=file_id,
                 media_body=media
             ).execute()
-            print('File updated:', updated_file.get('id'))
+            print('Google file updated:', updated_file.get('id'))
             return updated_file.get('id')
         else:
-            print(f"File '{drive_filename}' does not exist, creating...")
+            print(f"Google file '{drive_filename}' does not exist, creating...")
             file_metadata = {'name': drive_filename}
             if parent_folder_id:
                 file_metadata['parents'] = [parent_folder_id]
-            created_file = drive_service.files().create(
+            created_file = self.service.files().create(
                 body=file_metadata,
                 media_body=media,
                 fields='id'
             ).execute()
-            print('File created:', created_file.get('id'))
+            print('Google file created:', created_file.get('id'))
             return created_file.get('id')
 
 
@@ -300,7 +300,7 @@ def google_drive(token_fname):
         drive = build('drive', 'v3', credentials=creds)
         snippets_drive = DriveSnippets(drive, creds)
         print('Connection to google drive: OK')
-        return snippets_drive, drive
+        return snippets_drive
     except Exception as e:
         print('Failed to connect to Google Drive:', e)
         return None
@@ -315,7 +315,7 @@ def google_slide(token_fname):
         return snippets_slide
     except FileNotFoundError:
         print('Google slide token file not found at %s' % token_fname)
-        exit()
+        return None
 
 def init_slide(google, presentation_url, file_name):
     # create a slide and publish file name
@@ -332,33 +332,29 @@ def init_slide(google, presentation_url, file_name):
     
     return presentation_id, page_id
 
-
 def main():
-
-    snippets_slide = google_slide(GOOGLE_TOKEN)
-
-    presentation_url = 'https://docs.google.com/presentation/d/1gEtlkj5fYbQ5rJh1wgTmf6bh_FjqMP7aD5ZrF1_ZvTA/edit?usp=sharing'
-    file_name = 'test.hdf'
-    presentation_id, page_id = init_slide(snippets_slide, presentation_url, file_name)
-    descr = "test text box with bullet"
-    snippets_slide.create_textbox_with_bullets(presentation_id, page_id, descr, 240, 120, 0, 18, 8, 0)
-    
-    snippets_drive, drive_service = google_drive(GOOGLE_TOKEN)
+    # google drive file upload
+    snippets_drive = google_drive(GOOGLE_TOKEN)
     if snippets_drive:
         # Example: Upload image
-        folder_id = '1aVGsEXgxM1IPO9ZdSGUl4jkl6yGB-llT'
-        file_id = snippets_drive.upload_or_update_file(
-            drive_service=drive_service,
-            filepath='AD_02.png',
-            # mimetype='text/plain',
-            mimetype='image/png',
-            drive_filename='uploaded_image.png',
-            parent_folder_id=folder_id
-        )
+        folder_id = '1aVGsEXgxM1IPO9ZdSGUl4jkl6yGB-llT' # create a link to shared folder on the google drive, then extract the folder_id from the link: https://drive.google.com/drive/folders/folder_id?usp=sharing
+        file_id = snippets_drive.upload_or_update_file('AD_02.png', 'image/png', 'uploaded_image.png', folder_id)
     
     image_url = f"https://drive.google.com/uc?export=view&id={file_id}"
-    print("File URL:", image_url)
-    snippets_slide.create_image(presentation_id, page_id, image_url, 300, 300, 0, 0)
+    print("Google file URL:", image_url)
+
+
+    presentation_url = 'https://docs.google.com/presentation/d/1LJeW3p3VCDPXwhqhWkGTg4Z3mmkwwOsNfeeq9IzJ_yI/edit?usp=sharing' # decarlof
+    # presentation_url = 'https://docs.google.com/presentation/d/1gEtlkj5fYbQ5rJh1wgTmf6bh_FjqMP7aD5ZrF1_ZvTA/edit?usp=sharing' # usr2bmb
+
+    # slide publishing
+    snippets_slide = google_slide(GOOGLE_TOKEN)
+    if snippets_slide:
+        file_name =  'test.h5'
+        presentation_id, page_id = init_slide(snippets_slide, presentation_url, file_name)
+        descr = "test text box with bullet"
+        snippets_slide.create_textbox_with_bullets(presentation_id, page_id, descr, 240, 120, 0, 18, 8, 0)
+        snippets_slide.create_image(presentation_id, page_id, image_url, 300, 300, 0, 0)
 
 if __name__ == '__main__':
     main()
