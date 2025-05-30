@@ -13,12 +13,12 @@ class DriveSnippets(object):
         self.service = service
         self.credentials = credentials
 
-    def upload_file(self, filepath, mimetype, drive_filename, parent_folder_id=None):
-        file_metadata = {'name': drive_filename}
+    def upload_file(self, file_name, mimetype, parent_folder_id=None):
+        file_metadata = {'name': file_name}
         if parent_folder_id:
             file_metadata['parents'] = [parent_folder_id]
 
-        media = MediaFileUpload(filepath, mimetype=mimetype)
+        media = MediaFileUpload(file_name, mimetype=mimetype)
         file = self.service.files().create(
             body=file_metadata,
             media_body=media,
@@ -41,12 +41,12 @@ class DriveSnippets(object):
             return files[0]['id']
         return None
 
-    def upload_or_update_file(self, filepath, mimetype, drive_filename, parent_folder_id=None):
-        file_id = self.find_file_id(drive_filename, parent_folder_id)
-        media = MediaFileUpload(filepath, mimetype=mimetype)
+    def upload_or_update_file(self, file_name, mimetype, parent_folder_id=None):
+        file_id = self.find_file_id(file_name, parent_folder_id)
+        media = MediaFileUpload(file_name, mimetype=mimetype)
 
         if file_id:
-            print(f"Google file '{drive_filename}' exists (ID: {file_id}), updating...")
+            print(f"Google file '{file_name}' exists (ID: {file_id}), updating...")
             updated_file = self.service.files().update(
                 fileId=file_id,
                 media_body=media
@@ -56,8 +56,8 @@ class DriveSnippets(object):
             image_url = f"https://drive.google.com/uc?export=view&id={file_id}"
             return image_url
         else:
-            print(f"Google file '{drive_filename}' does not exist, creating...")
-            file_metadata = {'name': drive_filename}
+            print(f"Google file '{file_name}' does not exist, creating...")
+            file_metadata = {'name': file_name}
             if parent_folder_id:
                 file_metadata['parents'] = [parent_folder_id]
             created_file = self.service.files().create(
@@ -342,7 +342,7 @@ def main():
     if snippets_drive:
         # Example: Upload image
         folder_id = '1aVGsEXgxM1IPO9ZdSGUl4jkl6yGB-llT' # create a link to shared folder on the google drive, then extract the folder_id from the link: https://drive.google.com/drive/folders/folder_id?usp=sharing
-        image_url = snippets_drive.upload_or_update_file('AD_02.png', 'image/png', 'uploaded_image.png', folder_id)
+        image_url = snippets_drive.upload_or_update_file('AD_02.png', 'image/png', folder_id)
     
     # image_url = f"https://drive.google.com/uc?export=view&id={file_id}"
     print("Google file URL:", image_url)
