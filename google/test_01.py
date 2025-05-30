@@ -51,8 +51,10 @@ class DriveSnippets(object):
                 fileId=file_id,
                 media_body=media
             ).execute()
-            print('Google file updated:', updated_file.get('id'))
-            return updated_file.get('id')
+            file_id = updated_file.get('id')
+            print('Google file updated:', file_id)
+            image_url = f"https://drive.google.com/uc?export=view&id={file_id}"
+            return image_url
         else:
             print(f"Google file '{drive_filename}' does not exist, creating...")
             file_metadata = {'name': drive_filename}
@@ -63,8 +65,10 @@ class DriveSnippets(object):
                 media_body=media,
                 fields='id'
             ).execute()
-            print('Google file created:', created_file.get('id'))
-            return created_file.get('id')
+            file_id = created_file.get('id')
+            print('Google file created:', file_id)
+            image_url = f"https://drive.google.com/uc?export=view&id={file_id}"
+            return image_url
 
 
 class SlidesSnippets(object):
@@ -338,9 +342,9 @@ def main():
     if snippets_drive:
         # Example: Upload image
         folder_id = '1aVGsEXgxM1IPO9ZdSGUl4jkl6yGB-llT' # create a link to shared folder on the google drive, then extract the folder_id from the link: https://drive.google.com/drive/folders/folder_id?usp=sharing
-        file_id = snippets_drive.upload_or_update_file('AD_02.png', 'image/png', 'uploaded_image.png', folder_id)
+        image_url = snippets_drive.upload_or_update_file('AD_02.png', 'image/png', 'uploaded_image.png', folder_id)
     
-    image_url = f"https://drive.google.com/uc?export=view&id={file_id}"
+    # image_url = f"https://drive.google.com/uc?export=view&id={file_id}"
     print("Google file URL:", image_url)
 
 
