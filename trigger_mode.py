@@ -37,7 +37,7 @@ def wait_pv(epics_pv, wait_val, timeout=-1):
 def set_pvs():
     epics_pvs = {}
 
-    camera_prefix = '2bmbSP1:cam1:'
+    camera_prefix = '2bmSP2:cam1:'
     epics_pvs['CamManufacturer']      = PV(camera_prefix + 'Manufacturer_RBV')
     epics_pvs['CamModel']             = PV(camera_prefix + 'Model_RBV')
     epics_pvs['CamAcquire']           = PV(camera_prefix + 'Acquire')
@@ -52,13 +52,14 @@ def set_pvs():
     epics_pvs['CamBinY']              = PV(camera_prefix + 'BinY')
     epics_pvs['CamWaitForPlugins']    = PV(camera_prefix + 'WaitForPlugins')
     epics_pvs['PortNameRBV']          = PV(camera_prefix + 'PortName_RBV')
-
-    epics_pvs['CamExposureMode']     = PV(camera_prefix + 'ExposureMode')
-    epics_pvs['CamTriggerOverlap']   = PV(camera_prefix + 'TriggerOverlap')
-    epics_pvs['CamPixelFormat']      = PV(camera_prefix + 'PixelFormat')
-    epics_pvs['CamArrayCallbacks']   = PV(camera_prefix + 'ArrayCallbacks')
-    epics_pvs['CamFrameRateEnable']  = PV(camera_prefix + 'FrameRateEnable')
-    epics_pvs['CamTriggerSource']    = PV(camera_prefix + 'TriggerSource')
+    epics_pvs['CamExposureMode']      = PV(camera_prefix + 'ExposureMode')
+    epics_pvs['CamTriggerOverlap']    = PV(camera_prefix + 'TriggerOverlap')
+    epics_pvs['CamPixelFormat']       = PV(camera_prefix + 'PixelFormat')
+    epics_pvs['CamArrayCallbacks']    = PV(camera_prefix + 'ArrayCallbacks')
+    epics_pvs['CamFrameRateEnable']   = PV(camera_prefix + 'FrameRateEnable')
+    epics_pvs['CamTriggerSource']     = PV(camera_prefix + 'TriggerSource')
+    epics_pvs['CamImageSizeX']        = PV(camera_prefix + 'ArraySizeX_RBV')
+    epics_pvs['CamImageSizeY']        = PV(camera_prefix + 'ArraySizeY_RBV')
 
     prefix = '2bma:PSOFly2:'
     epics_pvs['PSOscanDelta']       = PV(prefix + 'scanDelta')
@@ -175,6 +176,7 @@ def compute_frame_time(epics_pvs):
     camera_model = epics_pvs['CamModel'].get(as_string=True)
     pixel_format = epics_pvs['CamPixelFormat'].get(as_string=True)
     readout = None
+    video_mode = None
     if camera_model == 'Grasshopper3 GS3-U3-23S6M':
         video_mode   = epics_pvs['CamVideoMode'].get(as_string=True)
         readout_times = {
@@ -191,6 +193,20 @@ def compute_frame_time(epics_pvs):
             'Mono16': 12.34
         }
         readout = readout_times[pixel_format]/1000.
+    if camera_model == 'Oryx ORX-10G-310S9M':
+        pixel_format = self.epics_pvs['CamPixelFormat'].get(as_string=True) 
+        image_size_x = self.epics_pvs['ImageSizeX'].get() 
+        image_size_y = self.epics_pvs['ImageSizeY'].get() 
+        readout_times = {
+            'Mono8': 30.0,
+            'Mono12Packed': 30.0,
+            'Mono16': 30.0
+        }
+        readout_margin = 1.2
+        readout = readout_times[pixel_format]/1000.
+        readout_estimate = estimate_readout_time(image_size_x, image_size_y, pixel_format, throughput_gbps=8.0):
+        print(readout, readout_estimate)
+        
     if readout is None:
         log.error('Unsupported combination of camera model, pixel format and video mode: %s %s %s',
                       camera_model, pixel_format, video_mode)
@@ -234,6 +250,37 @@ def wait_camera_done(epics_pvs, timeout):
     while True:
         if epics_pvs['CamAcquireBusy'].value == 0:
             return
+
+def estimate_readout_time(width, height, pixel_format='Mono8', throughput_gbps=8.0):
+    """
+    Estimate readout time in milliseconds.
+
+    Parameters:
+    - width: ROI width in pixels
+    - height: ROI height in pixels
+    - bit_depth: bits per pixel (8, 10, 12, 16)
+    - throughput_gbps: effective throughput of the interface (default 8 Gbps)
+
+    Returns:
+    - readout time in milliseconds
+    """
+
+    bit_depth = None
+    if pixel_format == 'Mono8':
+        bit_depth = 8
+    elif pixel_format == 'Mono12Packed':
+        bit_depth = 12
+    elif pixel_format == 'Mono16':
+        bit_depth = 16
+
+    if bit_depth is not None:
+        total_bits = width * height * bit_depth
+        throughput_bps = throughput_gbps * 1e9
+        readout_time_ms = (total_bits / throughput_bps) * 1000
+        return round(readout_time_ms, 2)
+    else:
+        log.error('pixel format %s is not valid' % pixel_format)
+        exit()
 
 def main():
 
