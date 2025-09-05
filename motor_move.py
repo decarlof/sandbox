@@ -1,6 +1,6 @@
 from epics import PV
 
-rotary_stage = PV('2bma:m82.VAL')
+rotary_stage = PV('2bmb:m102.VAL')
 
 rotary_stage_position = rotary_stage.get()
 print("First Position:", rotary_stage_position)
