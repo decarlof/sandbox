@@ -24,7 +24,7 @@ class DriveSnippets(object):
             media_body=media,
             fields='id'
         ).execute()
-        print('Google file uploaded. Google file ID:', file.get('id'))
+        log.info('Google file uploaded. Google file ID:', file.get('id'))
         
     def find_file_id(self, filename, parent_folder_id=None):
         query = f"name='{filename}'"
@@ -52,7 +52,7 @@ class DriveSnippets(object):
                 media_body=media
             ).execute()
             file_id = updated_file.get('id')
-            print('Google file updated:', file_id)
+            log.info('Google file updated:', file_id)
             image_url = f"https://drive.google.com/uc?export=view&id={file_id}"
             return image_url
         else:
@@ -66,7 +66,7 @@ class DriveSnippets(object):
                 fields='id'
             ).execute()
             file_id = created_file.get('id')
-            print('Google file created:', file_id)
+            log.info('Google file created:', file_id)
             image_url = f"https://drive.google.com/uc?export=view&id={file_id}"
             return image_url
 

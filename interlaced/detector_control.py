@@ -47,6 +47,7 @@ def init_epics_PVs(detector_prefix):
         global_PVs['Cam1TriggerSource']     = PV(detector_prefix + 'TriggerSource')
         global_PVs['Cam1TriggerOverlap']    = PV(detector_prefix + 'TriggerOverlap')
         global_PVs['Cam1ExposureMode']      = PV(detector_prefix + 'ExposureMode')
+        global_PVs['Cam1ExposureTime']      = PV(detector_prefix + 'ExposureTime')
         global_PVs['Cam1TriggerSelector']   = PV(detector_prefix + 'TriggerSelector')
         global_PVs['Cam1TriggerActivation'] = PV(detector_prefix + 'TriggerActivation')
     else:
@@ -83,12 +84,19 @@ def frame_rate():
 
     return fr
 
+
 def main():
 
+    detector_prefix = '2bmSP1:'
+    global_PVs = init_epics_PVs(detector_prefix)
 
     # # Current fly scan input parameters
-    # start_angle = 
-    # angle_step  =
+    exposure_time        = global_PVs['ExposureTime'].value
+    # rotation_start       = self.epics_pvs['RotationStart'].value
+    # rotation_step        = self.epics_pvs['RotationStep'].value
+    # num_angles           = self.epics_pvs['NumAngles'].value
+    # rotation_stop        = self.rotation_start + (self.num_angles * self.rotation_step)
+    # rotation_resolution  = self.epics_pvs['RotationResolution'].value
     
     fps = frame_rate()
     if fps is not None:
