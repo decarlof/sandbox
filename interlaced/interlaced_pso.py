@@ -4,8 +4,6 @@ import matplotlib.pyplot as plt
 # Parameters
 N = 10  # frames per rotation
 n = 3   # number of rotations
-exposure_time   = 0.2   # detector exposure time in s
-detector_x_size = 2048  # horizontal detector size in pixels
 
 # Interlaced delta per rotation
 offset = 180./(N * n - 1) # interlacing offset between rotations
