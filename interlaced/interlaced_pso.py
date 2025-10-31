@@ -1,12 +1,25 @@
+import numpy as np
 import matplotlib.pyplot as plt
 
 # Parameters
 N = 10  # frames per rotation
-n = 3  # number of rotations
+n = 3   # number of rotations
+exposure_time   = 0.2   # detector exposure time in s
+detector_x_size = 2048  # horizontal detector size in pixels
+blurr_error     = 1     # in pixel  
+
+r = detector_x_size / 2
+
+max_speed = np.degrees(np.acos((r - blurr_error) / r )) / exposure_time
+
+
+print(max_speed)
+
+exit()
 
 # Interlaced delta per rotation
-delta = 180 / N  # spacing within a single rotation
-offset = delta / n  # interlacing offset between rotations
+offset = 180./(N * n - 1) # interlacing offset between rotations
+delta = n * offset        # spacing within a single rotation
 
 # Generate angles for each rotation
 angles = []
@@ -57,3 +70,5 @@ plt.ylabel('Stage angle [deg]')
 plt.title('Cumulative Stage Positions for Continuous Interlaced Scan')
 plt.grid(True)
 plt.show()
+
+# print(np.diff(stage_positions))
