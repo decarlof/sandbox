@@ -1,87 +1,88 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 
 # Parameters
 detector_x_size = 2048  # horizontal detector size in pixels
 r = detector_x_size / 2
 
-# Exposure time (s) from 0.01 to 1.0 in 0.05 s steps
-exposure_times = np.arange(0.01, .5, 0.01)
+# Exposure time (s) from 0.01 to 0.5 in 0.01 s steps
+exposure_times = np.arange(0.01, 0.5, 0.01)
 
-# set the maximum blurr error acceptable
-max_blurr_error     = 1  # in pixel  
+# Set the maximum blur error acceptable
+max_blurr_error = 0.1  # in pixels  
 
-# Calculate max_speed for each exposure_time
-max_speeds = np.degrees(np.arccos((r - max_blurr_error) / r)) / exposure_times
-
-# Plot
-plt.figure(figsize=(7, 5))
-plt.plot(exposure_times, max_speeds, 'o-', linewidth=2)
-plt.xlabel('Exposure Time (s)')
-plt.ylabel('Max Angular Speed (°/s)')
-plt.title('Maximum Angular Speed vs Exposure Time')
-plt.grid(True)
-plt.show()
-
-
-# 3D surface plot showing how the maximum angular speed depends 
-# on both exposure_time and blurr_error.
-
-# Blurring error (pixels) from 0.1 to 1.0 in 0.1 px steps
-blurr_errors = np.arange(0.01, max_blurr_error, 0.001)
-
-# Create meshgrid
-E, B = np.meshgrid(exposure_times, blurr_errors)
-
-# Compute max angular speed (°/s)
-max_speeds = np.degrees(np.arccos((r - B) / r)) / E
-
-# 3D surface plot
-fig = plt.figure(figsize=(8, 6))
-ax = fig.add_subplot(111, projection='3d')
-
-surf = ax.plot_surface(E, B, max_speeds, cmap='viridis', edgecolor='none')
-
-ax.set_xlabel('Exposure Time (s)', labelpad=10)
-ax.set_ylabel('Blurring Error (pixels)', labelpad=10)
-ax.set_zlabel('Max Angular Speed (°/s)', labelpad=10)
-ax.set_title('Maximum Angular Speed vs Exposure Time and Blur Error')
-
-# Move the colorbar to the right (slightly detached)
-cbar = fig.colorbar(surf, shrink=0.8, aspect=10, pad=0.15)
-cbar.set_label('Max Angular Speed (°/s)')
-plt.tight_layout()
-plt.show()
-
-# The detector readout time depends on settings such as ROI size, binning, and bit depth.
-# It can be estimated by measuring the detector frame rate with the exposure time set to zero,
-# and then taking the reciprocal of that frame rate (1 / frame_rate_with_zero_exposure_time).
-
-frame_rate_with_zero_exposure_time = 163
+# Detector readout time (s)
+frame_rate_with_zero_exposure_time = 163  # Hz
 readout_time = 1 / frame_rate_with_zero_exposure_time
 
-# --- Compute theta_max (degrees) ---
-arg = (r - B) / r
-arg = np.clip(arg, -1.0, 1.0)          # numerical safety
-theta_max_deg = np.degrees(np.arccos(arg))
+# Compute max angular speed (°/s)
+max_speeds = np.degrees(np.arccos((r - max_blurr_error) / r)) / exposure_times
 
-# --- Compute total number of frames over 180° ---
-N_180 = 180 * E / ((E + readout_time) * theta_max_deg)
+# Compute total number of frames over 180° rotation
+theta_max_deg = np.degrees(np.arccos((r - max_blurr_error) / r))
+N_180 = 180 * exposure_times / ((exposure_times + readout_time) * theta_max_deg)
 
-# --- 3D Surface plot ---
-fig = plt.figure(figsize=(9, 6))
-ax = fig.add_subplot(111, projection='3d')
+# Tomography scenario: motor speed to step rotation_step
+rotation_step = 0.12  # degrees per projection
+motor_speeds = rotation_step / (exposure_times + readout_time)
 
-surf = ax.plot_surface(E, B, N_180, cmap='cividis', edgecolor='none', alpha=0.95)
 
-ax.set_xlabel('Exposure Time (s)', labelpad=10)
-ax.set_ylabel('Blurring Error (pixels)', labelpad=10)
-ax.set_zlabel('Total Frames in 180°', labelpad=15)
-ax.set_title('Total Number of Frames in 180° vs Exposure Time and Blur Error\n(readout_time = {:.6f} s)'.format(readout_time))
+# Total number of projections in 180° for the tomography motor speed
+N_proj_180 = int(np.round(180 / rotation_step))
 
-cbar = fig.colorbar(surf, shrink=0.6, aspect=10, pad=0.18)
-cbar.set_label('Frames per 180°')
 
-plt.tight_layout()
+# Plot
+plt.figure(figsize=(10, 5))
+plt.plot(exposure_times, max_speeds, 'o-', linewidth=2, 
+         label=f'Max Angular Speed (°/s); Total projections in 180 (N_180)°')
+plt.plot(exposure_times, motor_speeds, 's-', linewidth=2, 
+         label=f'TomoScan fly scan speed (°/s), rotation_step={rotation_step}°, projections in 180°={N_proj_180}')
+
+# Annotate total frames in 180° at min, mid, max exposure times
+indices = [0, len(exposure_times)//2, -1]
+for i in indices:
+    plt.annotate(f'N_180={int(N_180[i])}',
+                 xy=(exposure_times[i], max_speeds[i]),
+                 xytext=(5, 10),
+                 textcoords='offset points',
+                 arrowprops=dict(arrowstyle='->', color='red'),
+                 color='blue')
+
+plt.xlabel('Exposure Time (s)')
+plt.ylabel('Speed (°/s)')
+plt.title('Max Angular Speed vs Exposure Time and Motor Speed for Tomography')
+plt.grid(True)
+plt.legend()
+plt.show()
+
+
+# Compute total scan time to cover 180° (s)
+# Min time using max speed (depends on exposure time)
+total_time_min = 180 / max_speeds       # s
+total_time_motor = 180 / motor_speeds   # s
+
+# Plot
+plt.figure(figsize=(10, 5))
+plt.plot(exposure_times, total_time_min, 'o-', linewidth=2,
+         label=f'Min Scan Time (s) at Max Angular Speed; Total projections = {int(np.max(N_180))}')
+plt.plot(exposure_times, total_time_motor, 's-', linewidth=2,
+         label=f'TomoScan Fly Scan Time (s), rotation_step={rotation_step}°, projections = {N_proj_180}')
+
+# Annotate total scan time and number of projections at start, mid, end
+indices = [0, len(exposure_times)//2, -1]
+for i in indices:
+    plt.annotate(f'{total_time_min[i]:.1f}s\nN={int(N_180[i])}',
+                 xy=(exposure_times[i], total_time_min[i]),
+                 xytext=(0, 15),           # shift above point
+                 textcoords='offset points',
+                 ha='center',
+                 arrowprops=dict(arrowstyle='->', color='red'),
+                 color='blue',
+                 fontsize=10)
+
+plt.xlabel('Exposure Time (s)')
+plt.ylabel('Total Scan Time for 180° (s)')
+plt.title('Total Scan Time vs Exposure Time for 180° Rotation')
+plt.grid(True)
+plt.legend()
 plt.show()
