@@ -222,9 +222,17 @@ def main():
     rotation_velocity = rotary_stage_velocity(rotation_start, rotation_step, num_angles)
     logging.info('Rotary stage velocity: %f °/s', rotation_velocity)
 
-    # In an interlaced scan, the goal is instead to define the total time required for a full rotation,
-    # and use the measured camera frame rate to acquire projection images at predefined angular positions.
-    # Below is how to measure the detector frame rate
+    # In an interlaced scan, the goal is instead to define 
+    # N = number of frames per rotation
+    # n = numnber of rotation
+    # and set the rotation stage to run at the maximum velocity that does not cause image blurring
+
+    N = 6
+    n = 3
+    delta_theta = n * 180 / (N * n - 1)
+
+
+    # Let's measure the detector frame rate
     logging.info('******** *************** ********')
     logging.info('******** *************** ********')
     logging.info('******** INTERLACED SCAN ********')
