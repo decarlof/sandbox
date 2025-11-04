@@ -58,30 +58,30 @@ plt.tight_layout()
 plt.show()
 
 
-# ------------------------
-# Additional Polar Plot
-# ------------------------
-fig = plt.figure(figsize=(6, 6))
-ax = fig.add_subplot(111, polar=True)
+# # ------------------------
+# # Additional Polar Plot
+# # ------------------------
+# fig = plt.figure(figsize=(6, 6))
+# ax = fig.add_subplot(111, polar=True)
 
-# Generate theta positions for each exposure time
-for i, (t, theta_step) in enumerate(zip(exposure_times, theta_per_frame)):
-    # Compute number of frames for 180° and angle step in radians
-    n_frames = int(frames_per_180deg[i])
-    theta_positions = np.linspace(0, np.pi, n_frames)  # 0 to 180° in radians
+# # Generate theta positions for each exposure time
+# for i, (t, theta_step) in enumerate(zip(exposure_times, theta_per_frame)):
+#     # Compute number of frames for 180° and angle step in radians
+#     n_frames = int(frames_per_180deg[i])
+#     theta_positions = np.linspace(0, np.pi, n_frames)  # 0 to 180° in radians
     
-    # Concentric circle radius proportional to exposure time
-    radius = (i + 1) / len(exposure_times)
+#     # Concentric circle radius proportional to exposure time
+#     radius = (i + 1) / len(exposure_times)
     
-    # Plot projection positions as points on a circular arc
-    ax.plot(theta_positions, np.full_like(theta_positions, radius), 'o', markersize=3)
+#     # Plot projection positions as points on a circular arc
+#     ax.plot(theta_positions, np.full_like(theta_positions, radius), 'o', markersize=3)
     
-# Style
-ax.set_title('Projection Angle Positions per Exposure Time', va='bottom')
-ax.set_yticks([])  # hide radial ticks
-ax.set_xticks(np.linspace(0, np.pi, 7))  # 0–180° markers
-ax.set_xticklabels([f'{np.degrees(a):.0f}°' for a in np.linspace(0, np.pi, 7)])
-ax.grid(True)
+# # Style
+# ax.set_title('Projection Angle Positions per Exposure Time', va='bottom')
+# ax.set_yticks([])  # hide radial ticks
+# ax.set_xticks(np.linspace(0, np.pi, 7))  # 0–180° markers
+# ax.set_xticklabels([f'{np.degrees(a):.0f}°' for a in np.linspace(0, np.pi, 7)])
+# ax.grid(True)
 
-plt.tight_layout()
-plt.show()
+# plt.tight_layout()
+# plt.show()
