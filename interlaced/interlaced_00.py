@@ -1,139 +1,100 @@
-import sys
-import math
-import argparse
 import numpy as np
 import matplotlib.pyplot as plt
-import log
 
+# -----------------------------
+# Input parameters
+# -----------------------------
+detector_x_size = 2048  # horizontal detector size in pixels
+r = detector_x_size / 2
+frame_rate_with_zero_exposure_time = 50  # Hz (measured for detector configuration)
+readout_time = 1 / frame_rate_with_zero_exposure_time  # s
 
-def _compute_senses():
-    '''Computes whether this motion will be increasing or decreasing encoder counts.
-    
-    user direction, overall sense.
-    '''
-    # Encoder direction compared to dial coordinates
-    encoder_dir = 1 #if self.epics_pvs['PSOEncoderCountsPerStep'].get() > 0 else -1
-    # Get motor direction (dial vs. user); convert (0,1) = (pos, neg) to (1, -1)
-    motor_dir = 1 # if self.epics_pvs['RotationDirection'].get() == 0 else -1
-    # Figure out whether motion is in positive or negative direction in user coordinates
-    user_direction = 1 #if self.rotation_stop > self.rotation_start else -1
-    # Figure out overall sense: +1 if motion in + encoder direction, -1 otherwise
-    return user_direction * motor_dir * encoder_dir, user_direction
+# ---- USER INPUT ----
+exposure_time = 0.1        # s
+max_blurr_error = 1         # pixels
+angles_user = np.array([0, 5, 10, 15, 20, 25, 30, 40, 50, 60, 80, 100, 120, 140, 160, 180])  # arbitrary example
+# -----------------------------
 
-def compute_positions_PSO(rotation_start, rotation_step, num_angles, PSOCountsPerRotation):
-    '''Computes several parameters describing the fly scan motion.
-    Computes the spacing between points, ensuring it is an integer number
-    of encoder counts.
-    Uses this spacing to recalculate the end of the scan, if necessary.
-    Computes the taxi distance at the beginning and end of scan to allow
-    the stage to accelerate to speed.
-    Assign the fly scan angular position to theta[]
-    '''
-    overall_sense, user_direction = _compute_senses()
-    # Get the distance needed for acceleration = 1/2 a t^2 = 1/2 * v * t
-    motor_accl_time = 3 #float(self.epics_pvs['RotationAccelTime'].get()) # Acceleration time in s
-    accel_dist = motor_accl_time / 2.0 * 100#float(self.motor_speed) 
+# Compute maximum angular speed (°/s) to stay below the blur error
+theta_max_deg = np.degrees(np.arccos((r - max_blurr_error) / r))
+omega_max = theta_max_deg / exposure_time  # °/s
 
-    # Compute the actual delta to keep each interval an integer number of encoder counts
-    encoder_multiply = PSOCountsPerRotation / 360.   #float(self.epics_pvs['PSOCountsPerRotation'].get()) / 360.
-    raw_delta_encoder_counts = rotation_step * encoder_multiply
-    delta_encoder_counts = round(raw_delta_encoder_counts)
-    if abs(raw_delta_encoder_counts - delta_encoder_counts) > 1e-4:
-        log.warning('  *** *** *** Requested scan would have used a non-integer number of encoder counts.')
-        log.warning('  *** *** *** Calculated # of encoder counts per step = {0:9.4f}'.format(raw_delta_encoder_counts))
-        log.warning('  *** *** *** Instead, using {0:d}'.format(delta_encoder_counts))
-    # self.epics_pvs['PSOEncoderCountsPerStep'].put(delta_encoder_counts)
-    # Change the rotation step Python variable and PV
-    rotation_step = delta_encoder_counts / encoder_multiply
-    # self.epics_pvs['RotationStep'].put(self.rotation_step)
-      
-    # Make taxi distance an integer number of measurement deltas >= accel distance
-    # Add 1/2 of a delta to ensure that we are really up to speed.
-    taxi_dist = (math.ceil(accel_dist / rotation_step) + 0.5) * rotation_step 
-    # self.epics_pvs['PSOStartTaxi'].put(self.rotation_start - taxi_dist * user_direction)
-    # self.epics_pvs['PSOEndTaxi'].put(self.rotation_stop + taxi_dist * user_direction)
-    
-    #Where will the last point actually be?
-    rotation_stop = (rotation_start 
-                            + (num_angles - 1) * rotation_step * user_direction)
-    # Assign the fly scan angular position to theta[]
-    theta = rotation_start + np.arange(num_angles) * rotation_step * user_direction
-    log.info(theta)
+# Compute angular motion during exposure and readout
+angular_motion_exposure = omega_max * exposure_time  # = theta_max_deg
+angular_motion_readout = omega_max * readout_time
+delta_theta_allowed = angular_motion_exposure + angular_motion_readout
 
-def sequence(nproj_total, nproj_per_rot, prime, continuous_angle=True):
+# -----------------------------
+# Check if the user list is acceptable (with detailed violation report)
+# -----------------------------
+angles_user = np.sort(angles_user)
+diffs = np.diff(angles_user)
 
-    # seq = np.array((nproj_total * nproj_per_rot))
-    seq = []
-    # nproj_per_rot = int(nproj_per_rot)
-    # print (len(seq))
-    i = 0
+acceptable = np.all(diffs >= delta_theta_allowed - 1e-6)  # small tolerance
 
-    while len(seq) < nproj_total:
+if acceptable:
+    print("✅ The provided list of angles is acceptable.")
+    angles_final = angles_user
+else:
+    print("❌ The provided list violates blur/readout constraints.")
+    print(f"Minimum allowed angular step (Δθ_allowed): {delta_theta_allowed:.4f}°\n")
 
-        b = i
-        i += 1
-        r = 0
-        q = 1 / prime
+    # Find and report specific violations
+    print("Violating angle pairs (start → next):")
+    for i, d in enumerate(diffs):
+        if d < delta_theta_allowed:
+            print(f"  Between {angles_user[i]:7.3f}° → {angles_user[i+1]:7.3f}°  "
+                  f"(Δ = {d:7.4f}° < {delta_theta_allowed:.4f}°)")
 
-        while (b != 0):
-            a = np.mod(b, prime)
-            r += (a * q)
-            # print (b, r, a, q)
-            q /= prime
-            b = np.floor(b / prime)
-        r *= (360.0 / nproj_per_rot)
+    # Propose corrected list:
+    angles_final = [angles_user[0]]
+    for a in angles_user[1:]:
+        if a - angles_final[-1] >= delta_theta_allowed:
+            angles_final.append(a)
+    # Extend up to 180° if possible
+    while angles_final[-1] + delta_theta_allowed <= 180:
+        angles_final.append(angles_final[-1] + delta_theta_allowed)
+    angles_final = np.array(angles_final)
 
-        k = 0
-        while (np.logical_and(len(seq) < nproj_total, k < nproj_per_rot)):
-            seq.append(float(r + k * 360.0 / nproj_per_rot ))
-            k += 1
+    print("\n👉 Proposed acceptable angles:")
+    print(np.round(angles_final, 3))
 
-    if continuous_angle:
-        j = 0
-        for x in range(len(seq)):       
-            if (x%nproj_per_rot == 0):
-                for y in range(nproj_per_rot):
-                    if (x+y) < len(seq):
-                        seq[x+y] += j*360.0
-                j += 1
+# -----------------------------
+# Visualization
+# -----------------------------
+fig, ax = plt.subplots(subplot_kw={'projection': 'polar'}, figsize=(7, 7))
 
-    return seq
+# Convert degrees → radians
+user_rad = np.deg2rad(angles_user)
+final_rad = np.deg2rad(angles_final)
+exp_arc_rad = np.deg2rad(angular_motion_exposure)
+read_arc_rad = np.deg2rad(angular_motion_readout)
 
-def main(arg):
+# Plot user-supplied triggers
+ax.scatter(user_rad, np.ones_like(user_rad), color='C0', s=35, label='User angles')
 
-    lfname = './logger.txt'
- 
-    log.setup_custom_logger(lfname)
-    log.info("Saving log at %s" % lfname)
+# Plot adjusted triggers (if changed)
+if not acceptable:
+    ax.scatter(final_rad, np.ones_like(final_rad), color='C3', s=45, marker='x', label='Adjusted angles')
 
+# Show exposure arcs
+for theta in final_rad:
+    arc_t = np.linspace(theta, theta + exp_arc_rad, 40)
+    ax.plot(arc_t, np.ones_like(arc_t), color='C1', lw=2, alpha=0.7)
 
-    rotation_start = 0 
-    rotation_step = 0.12
-    num_angles = 1500  
-    PSOCountsPerRotation = 7200000
+# Show readout arcs
+for theta in final_rad:
+    arc_t = np.linspace(theta + exp_arc_rad, theta + exp_arc_rad + read_arc_rad, 30)
+    ax.plot(arc_t, np.ones_like(arc_t), color='C2', lw=2, ls='--', alpha=0.7)
 
-    compute_positions_PSO(rotation_start, rotation_step, num_angles, PSOCountsPerRotation)
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--nproj_total", nargs='?', type=int, default=100, help="total number of projections: 100 (default 100)")
-    parser.add_argument("--nproj_per_rot", nargs='?', type=int, default=10, help="total number of projections per rotation: 10 (default 10)")
-    parser.add_argument("--prime", nargs='?', type=int, default=10, help="prime: 2 (default 2). Ratio to position the first angle past 360")
-    parser.add_argument("--continuous_angle",action="store_true", help="set to generate continuous angles past 360 deg")
-
-    args = parser.parse_args()
-
-    nproj_total = args.nproj_total
-    nproj_per_rot = args.nproj_per_rot
-    prime = args.prime
-    continuous_angle = args.continuous_angle
-
-    seq = sequence(nproj_total, nproj_per_rot, prime, continuous_angle)
-
-    log.info(seq)
-    plt.plot(seq)
-    plt.grid('on')
-    plt.show()
-
-
-if __name__ == "__main__":
-    main(sys.argv[1:])
-
+# Aesthetic
+ax.set_rticks([])
+ax.set_yticklabels([])
+ax.set_ylim(0.9, 1.1)
+ax.set_theta_zero_location('N')
+ax.set_theta_direction(-1)
+ax.set_title(f"Exposure = {exposure_time:.3f}s, Readout = {readout_time:.4f}s\n"
+             f"Exposure arc = {angular_motion_exposure:.3f}°, Readout arc = {angular_motion_readout:.3f}°\n"
+             f"Δθ_allowed = {delta_theta_allowed:.3f}°", pad=20)
+ax.legend(loc='upper right', bbox_to_anchor=(0.95, 0.95), frameon=True, framealpha=0.8)
+plt.show()
