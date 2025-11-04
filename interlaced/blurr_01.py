@@ -12,7 +12,7 @@ exposure_times = np.arange(0.01, 0.5, 0.01)
 max_blurr_error = 1  # in pixels  
 
 # Detector readout time (s)
-frame_rate_with_zero_exposure_time = 1  # Hz this should be measured for each detector configuration
+frame_rate_with_zero_exposure_time = 160  # Hz this should be measured for each detector configuration
 readout_time = 1 / frame_rate_with_zero_exposure_time
 
 # Compute max angular speed (°/s)
@@ -22,46 +22,6 @@ max_speeds = np.degrees(np.arccos((r - max_blurr_error) / r)) / exposure_times
 theta_max_deg = np.degrees(np.arccos((r - max_blurr_error) / r))
 N_180 = 180 * exposure_times / ((exposure_times + readout_time) * theta_max_deg)
 
-
-
-# angles_list = []
-# for i, exp_time in enumerate(exposure_times):
-#     omega_max = max_speeds[i]  # °/s
-#     delta_theta = omega_max * (exp_time + readout_time)  # ° per frame
-#     n_frames = int(np.floor(180 / delta_theta))
-#     angles = np.arange(0, n_frames) * delta_theta
-#     angles_list.append(angles)
-
-# # --- Circular plot showing the image acquisition angles ---
-# fig, ax = plt.subplots(subplot_kw={'projection': 'polar'}, figsize=(6, 6))
-
-# # Choose which exposure time to visualize (index)
-# i_plot = 10  # e.g., exposure_times[10] = 0.11 s
-# angles_deg = angles_list[i_plot]
-# exp_time = exposure_times[i_plot]
-# omega_max = max_speeds[i_plot]
-# delta_theta = omega_max * (exp_time + readout_time)
-# theta_max_deg = np.degrees(np.arccos((r - max_blurr_error) / r))
-# arc_length_deg = theta_max_deg  # approximate blur span
-
-# # Convert to radians for plotting
-# angles_rad = np.deg2rad(angles_deg)
-# arc_rad = np.deg2rad(arc_length_deg)
-
-# # Plot acquisition positions
-# ax.scatter(angles_rad, np.ones_like(angles_rad), s=30, color='C0', label='Projection angles')
-
-# # Draw arcs showing exposure blur range
-# for theta in angles_rad:
-#     arc_thetas = np.linspace(theta - arc_rad / 2, theta + arc_rad / 2, 30)
-#     ax.plot(arc_thetas, np.ones_like(arc_thetas), color='C1', lw=1.2, alpha=0.6)
-
-# # Format plot
-# ax.set_rticks([])
-# ax.set_yticklabels([])
-# ax.set_title(f"Projection Angles (Exposure = {exp_time:.2f}s, Blur Arc = {arc_length_deg:.3f}°)")
-# ax.legend(loc='upper right', bbox_to_anchor=(1.3, 1.1))
-# plt.show()
 
 # --- Additional code for visualization and angle list ---
 # Choose exposure-time index to visualize (change as needed; keep within exposure_times range)
@@ -137,7 +97,7 @@ print(trigger_angles_deg.tolist())
 
 # ##############################################
 # Tomography scenario: user enters the step size
-rotation_step = 0.12  # degrees per projection this should be read from tomoStan
+rotation_step = 2.57  # degrees per projection this should be read from tomoStan
 motor_speeds = rotation_step / (exposure_times + readout_time)
 
 
@@ -147,13 +107,11 @@ N_proj_180 = int(np.round(180 / rotation_step))
 # Convert readout time to ms for legend
 readout_time_ms = readout_time * 1000
 
-
 # Compute effective blur for fly scan
 effective_blur_rad = np.radians(motor_speeds * (exposure_times + readout_time))  # angular rotation during exposure
 effective_blur_px = r * (1 - np.cos(effective_blur_rad))
 # Since all values are identical, pick the first
 effective_blur_px_val = effective_blur_px[0]
-
 
 # Plot: Angular Speeds
 plt.figure(figsize=(10, 5))
