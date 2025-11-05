@@ -69,7 +69,7 @@ fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 10))
 ax1.plot(exposure_times, speeds, 'o-', linewidth=2,
           label=f'At max speed with  blur={set_blur} px, readout={readout_time_ms:.2f} ms, projections = N')
 ax1.plot(exposure_times, motor_speeds, 's-', linewidth=2,
-          label=f'At TomoScan scan speed, blur≈{effective_blur_px[0]:.7f}-{effective_blur_px[-1]:.7f}px, step={rotation_step}°, readout={readout_time_ms:.4f} ms, projections={N_proj_180}')
+          label=f'At TomoScan scan speed, step={rotation_step}°, readout={readout_time_ms:.4f} ms, projections={N_proj_180}, blur≈{effective_blur_px[0]:.7f}-{effective_blur_px[-1]:.7f}px')
 
 indices = [0, len(exposure_times)//2, -1]
 for i in indices:
@@ -93,7 +93,7 @@ total_time_motor = 180 / motor_speeds
 ax2.plot(exposure_times, total_time_min, 'o-', linewidth=2,
           label=f'Scan time at max speed with blur={set_blur}px, readout={readout_time_ms:.2f}ms, projections=N')
 ax2.plot(exposure_times, total_time_motor, 's-', linewidth=2,
-          label=f'TomoScan time, step={rotation_step}°, blur≈blur≈{effective_blur_px[0]:.7f}-{effective_blur_px[-1]:.7f}px readout={readout_time_ms:.2f}ms, projections = {N_proj_180}')
+          label=f'TomoScan time, step={rotation_step}°, readout={readout_time_ms:.2f}ms, projections = {N_proj_180}, blur≈blur≈{effective_blur_px[0]:.7f}-{effective_blur_px[-1]:.7f}px')
 
 for i in indices:
     ax2.annotate(f'{total_time_min[i]:.1f}s\nN={int(frames_per_180deg[i])}',
