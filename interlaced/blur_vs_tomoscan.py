@@ -1,57 +1,71 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-# ------------------------
-# Parameters
-# ------------------------
+# This Python script analyzes and visualizes the relationship between rotation speed, exposure time, 
+# and scanning parameters for a tomographic imaging setup. 
+# Two scenarios are considered:
+#   1. A maximum-speed scenario constrained by a fixed detector blur limit.
+#   2. A typical TomoScan scenario with a fixed angular step per projection.
+# For each case, the script computes the maximum allowable rotation speed and the corresponding 
+# total scan time for a 180° rotation. 
+# It also accounts for the detector readout time and compares both scenarios to help plan 
+# tomographic scans that balance speed and image quality.
+
+# In both cases projections are acquired sequentially, with a minimal temporal gap equal to the detector 
+# readout time between consecutive exposures.
+# ##############################################
+# Case 1: Maximum-speed scenario constrained by a fixed detector blur limit.
+# ##############################################
 detector_x_size = 2048  # horizontal detector size in pixels
 r = detector_x_size / 2  # detector radius in pixels
 
-# Exposure times (s)
-exposure_times = np.arange(0.01, 0.5, 0.01)
+# Exposure times (s) to evaluate
+exposure_times = np.arange(0.05, 0.5, 0.05)
 
-# Maximum allowed blur (pixels)
-set_blur = 0.0021897 # pixels
+# Maximum allowed detector blur (pixels) for the max-speed scenario
+# set_blur = 0.0022453 # pixels seelct this to match tomoScan
+set_blur = 0.2 # pixels
 
 # ------------------------
-# Calculate max allowed angle from blur
+# Calculate maximum allowable rotation based on blur limit
 # ------------------------
-theta_exposure_time = np.degrees(np.arccos((r - set_blur) / r))  # theta travel during the exposure time
-speeds = theta_exposure_time / exposure_times                    # speed is locked to meet the blur requirement
+theta_exposure_time = np.degrees(np.arccos((r - set_blur) / r))  # angular displacement during exposure
+speeds = theta_exposure_time / exposure_times                    # max rotation speed limited by blur
 
 # Detector readout time (s)
+# frame_rate_with_zero_exposure_time = 160000  # Hz pixels seelct this to match tomoScan
 frame_rate_with_zero_exposure_time = 160  # Hz
 readout_time = 1 / frame_rate_with_zero_exposure_time
 
-theta_readouts  = speeds * readout_time                   # theta travel during the readout time
-theta_per_frame = theta_exposure_time + theta_readouts    # theta travel between frames
-times_per_frame = exposure_times + readout_time           # time per frame
+theta_readouts  = speeds * readout_time                   # angular displacement during readout
+theta_per_frame = theta_exposure_time + theta_readouts    # total angular step per frame
+times_per_frame = exposure_times + readout_time           # total time per frame
 
 # ------------------------
-# Total number of frames over 180°
+# Total number of frames for a 180° rotation
 # ------------------------
 frames_per_180deg = 180 / theta_per_frame
 
 # ##############################################
-# Tomography scenario: user enters the step size
-rotation_step = 0.12  # degrees per projection this should be read from tomoScan
-motor_speeds = rotation_step / (exposure_times + readout_time) # this is close to the way TomoScan sets the speed to make sure the detector is able to take an image at each angle step
+# Case 2: Typical TomoScan scenario with a fixed angular step per projection and user-defined angular step per projection
+# ##############################################
+rotation_step = 0.12  # degrees per projection (typical TomoScan step)
+motor_speeds = rotation_step / (exposure_times + readout_time) # rotation speed required to match the step and detector readout
 
-# Total number of projections in 180° for the tomography motor speed
+# Total number of projections for a 180° rotation at TomoScan speed
 N_proj_180 = int(np.round(180 / rotation_step))
 
-# Convert readout time to ms for legend
+# Convert readout time to milliseconds for plotting
 readout_time_ms = readout_time * 1000
 
-# Compute effective blur for fly scan
-# TomoScan blurs change with the speed
-effective_blur_rad = np.radians(rotation_step - motor_speeds * readout_time)  # angular rotation during exposure
+# Compute effective blur for TomoScan fly scan (depends on speed)
+effective_blur_rad = np.radians(rotation_step - motor_speeds * readout_time)  # angular displacement during exposure
 effective_blur_px = r * (1 - np.cos(effective_blur_rad))
 
-# === Create one figure with two stacked subplots ===
+# === Create figure with two stacked subplots ===
 fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 10))
 
-# --- Top plot: Angular Speeds ---
+# --- Top plot: Angular Speeds for both scenarios ---
 ax1.plot(exposure_times, speeds, 'o-', linewidth=2,
           label=f'At max speed with  blur={set_blur} px, readout={readout_time_ms:.2f} ms, projections = N')
 ax1.plot(exposure_times, motor_speeds, 's-', linewidth=2,
@@ -70,9 +84,9 @@ ax1.set_xlabel('Exposure Time (s)')
 ax1.set_ylabel('Speed (°/s)')
 ax1.set_title('Rotation speed vs Exposure Time')
 ax1.grid(True)
-ax1.legend(fontsize=7)  # smaller legend font for top plot
+ax1.legend(fontsize=7)  # smaller font to fit nicely
 
-# --- Bottom plot: Total Scan Time ---
+# --- Bottom plot: Total Scan Time for 180° rotation ---
 total_time_min = 180 / speeds
 total_time_motor = 180 / motor_speeds
 
@@ -95,8 +109,7 @@ ax2.set_xlabel('Exposure Time (s)')
 ax2.set_ylabel('Total Scan Time for 180° (s)')
 ax2.set_title('Total Scan Time vs Exposure Time')
 ax2.grid(True)
-ax2.legend(fontsize=7)  # smaller legend font for bottom plot
-
+ax2.legend(fontsize=7)  # smaller font to fit nicely
 
 plt.tight_layout()
 plt.show()
