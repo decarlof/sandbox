@@ -24,17 +24,18 @@ exposure_times = np.arange(0.05, 0.5, 0.05)
 
 # Maximum allowed detector blur (pixels) for the max-speed scenario
 # set_blur = 0.0022453 # pixels seelct this to match tomoScan
-set_blur = 0.2 # pixels
+# set_blur = 2*1.0723301 # pixels
+set_blur = 3 # pixels
 
 # ------------------------
 # Calculate maximum allowable rotation based on blur limit
 # ------------------------
-theta_exposure_time = np.degrees(np.arccos((r - set_blur) / r))  # angular displacement during exposure
+theta_exposure_time = np.degrees(2*np.arcsin((set_blur/(2*r)) )) # angular displacement during exposure
 speeds = theta_exposure_time / exposure_times                    # max rotation speed limited by blur
 
 # Detector readout time (s)
 # frame_rate_with_zero_exposure_time = 160000  # Hz pixels select this to match tomoScan
-frame_rate_with_zero_exposure_time = 160  # Hz this should be measured for each detector configuration
+frame_rate_with_zero_exposure_time = 16  # Hz this should be measured for each detector configuration
 readout_time = 1 / frame_rate_with_zero_exposure_time
 
 theta_readouts  = speeds * readout_time                   # angular displacement during readout
@@ -49,7 +50,7 @@ frames_per_180deg = 180 / theta_per_frame
 # ##############################################
 # Case 2: Typical TomoScan scenario with a fixed angular step per projection and user-defined angular step per projection
 # ##############################################
-rotation_step = 0.12  # degrees per projection (typical TomoScan step)
+rotation_step = 0.12 # degrees per projection (typical TomoScan step)
 motor_speeds = rotation_step / (exposure_times + readout_time) # rotation speed required to match the step and detector readout
 
 # Total number of projections for a 180° rotation at TomoScan speed
@@ -59,8 +60,9 @@ N_proj_180 = int(np.round(180 / rotation_step))
 readout_time_ms = readout_time * 1000
 
 # Compute effective blur for TomoScan fly scan (depends on speed)
-effective_blur_rad = np.radians(rotation_step - motor_speeds * readout_time)  # angular displacement during exposure
-effective_blur_px = r * (1 - np.cos(effective_blur_rad))
+effective_blur_rad = np.radians(motor_speeds * exposure_times)  # angular displacement during exposure
+# effective_blur_px = r * (1 - np.cos(effective_blur_rad))
+effective_blur_px = 2 * r * np.sin(effective_blur_rad/2)
 
 # === Create figure with two stacked subplots ===
 fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 10))
