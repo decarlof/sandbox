@@ -6,30 +6,35 @@ detector_x_size = 2048  # horizontal detector size in pixels
 r = detector_x_size / 2
 
 # Exposure time (s) from 0.01 to 0.5 in 0.01 s steps
-exposure_times = np.arange(0.01, 0.5, 0.01)
+exposure_times = np.arange(0.05, 0.5, 0.05)
 
 # Set the maximum blur error acceptable
-max_blurr_error = 1  # in pixels  
+set_blur = 3  # in pixels  
 
 # Detector readout time (s)
-frame_rate_with_zero_exposure_time = 1  # Hz this should be measured for each detector configuration
+frame_rate_with_zero_exposure_time = 16 # Hz this should be measured for each detector configuration
 readout_time = 1 / frame_rate_with_zero_exposure_time
 
 # Compute max angular speed (°/s)
-max_speeds = np.degrees(np.arccos((r - max_blurr_error) / r)) / exposure_times
+theta_exposure_time = np.degrees(2*np.arcsin((set_blur/(2*r)) )) # angular displacement during exposure
+speeds = theta_exposure_time / exposure_times                    # max rotation speed limited by blur
 
-# Compute total number of frames over 180° rotation
-theta_max_deg = np.degrees(np.arccos((r - max_blurr_error) / r))
-N_180 = 180 * exposure_times / ((exposure_times + readout_time) * theta_max_deg)
+theta_readouts  = speeds * readout_time                   # angular displacement during readout
+theta_per_frame = theta_exposure_time + theta_readouts    # total angular step per frame
+times_per_frame = exposure_times + readout_time           # total time per frame
 
+# ------------------------
+# Total number of frames for a 180° rotation
+# ------------------------
+frames_per_180deg = 180 / theta_per_frame
 
 # --- Additional code for visualization and angle list ---
 # Choose exposure-time index to visualize (change as needed; keep within exposure_times range)
-i_plot = 10  # for example; exposure_times[i_plot] is the exposure shown
+i_plot = -1  # for example; exposure_times[i_plot] is the exposure shown
 
 exp_time = exposure_times[i_plot]
-omega_max = max_speeds[i_plot]           # °/s (as you computed)
-# angular motion while exposing (°). For your max_speeds this equals theta_max_deg
+omega_max = speeds[i_plot]           # °/s (as you computed)
+# angular motion while exposing (°). For your speeds this equals theta_max_deg
 exposure_arc_deg = omega_max * exp_time
 # angular motion during readout (°)
 readout_arc_deg = omega_max * readout_time
@@ -94,7 +99,7 @@ textstr = '\n'.join((
     r'Input parameters:',
     fr'Exposure = {exp_time:.3f} s',
     fr'Frame rate with 0s exposure time = {frame_rate_with_zero_exposure_time:.2f} fps',
-    fr'Max blur = {max_blurr_error} px'))
+    fr'Max blur = {set_blur} px'))
 props = dict(boxstyle='round', facecolor='white', alpha=0.8)
 ax.text(0.02, 0.02, textstr, transform=ax.figure.transFigure,
         fontsize=10, verticalalignment='bottom', bbox=props)

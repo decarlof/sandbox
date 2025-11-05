@@ -33,8 +33,8 @@ theta_exposure_time = np.degrees(np.arccos((r - set_blur) / r))  # angular displ
 speeds = theta_exposure_time / exposure_times                    # max rotation speed limited by blur
 
 # Detector readout time (s)
-# frame_rate_with_zero_exposure_time = 160000  # Hz pixels seelct this to match tomoScan
-frame_rate_with_zero_exposure_time = 160  # Hz
+# frame_rate_with_zero_exposure_time = 160000  # Hz pixels select this to match tomoScan
+frame_rate_with_zero_exposure_time = 160  # Hz this should be measured for each detector configuration
 readout_time = 1 / frame_rate_with_zero_exposure_time
 
 theta_readouts  = speeds * readout_time                   # angular displacement during readout
