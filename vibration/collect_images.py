@@ -13,6 +13,27 @@ DetectorAcquire = 1
 HDFIdle = 0
 HDFCapture = 1
 
+"""
+This script:
+
+- Configures an areadetector and HDF1 plugin once at startup:
+  - Sets the number of images to acquire.
+  - Sets the detector image mode to Multiple.
+  - Sets the HDF1 plugin NumCapture to match the number of images.
+  - Builds an HDF filename from a PV, e.g. OPS:message6 plus a timestamp.
+
+- Then idles, monitoring a trigger PV e.g. OPS:message17.
+
+- Each time the trigger PV changes to the string "start" (from any other value),
+  the script starts exactly one data collection with the configured number of images.
+
+- If the trigger PV remains "start", no additional collections are started.
+
+- When the trigger PV changes to any value other than "start", the system re-arms
+  and waits for the next transition to "start" to begin another collection.
+
+- This cycle repeats indefinitely until the script is stopped (for example, with Ctrl-C).
+"""
 
 def wait_pv(pv, wait_val, max_timeout_sec=-1):
 
