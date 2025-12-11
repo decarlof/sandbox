@@ -10,17 +10,17 @@ EPSILON = 0.1
 DetectorIdle = 0
 DetectorAcquire = 1
 
-HDFIdle = 0
-HDFCapture = 1
+FilePluginIdle = 0
+WritePluginCapture = 1
 
 """
 This script:
 
-- Configures an areadetector and HDF1 plugin once at startup:
+- Configures an areadetector and write plugin once at startup:
   - Sets the number of images to acquire.
   - Sets the detector image mode to Multiple.
-  - Sets the HDF1 plugin NumCapture to match the number of images.
-  - Builds an HDF filename from a PV, e.g. OPS:message6 plus a timestamp.
+  - Sets the TIFF1/HDF1 plugin NumCapture to match the number of images.
+  - Builds an TIFF/HDF filename from a PV, e.g. OPS:message6 plus a timestamp.
 
 - Then idles, monitoring a trigger PV e.g. OPS:message17.
 
@@ -64,7 +64,7 @@ def wait_pv(pv, wait_val, max_timeout_sec=-1):
             return True
 
 
-def init_general_PVs(aps_start_pv, aps_file_name_pv, detector_prefix):
+def init_general_PVs(aps_start_pv, aps_file_name_pv, detector_prefix, file_format):
 
     global_PVs = {}
 
@@ -116,11 +116,15 @@ def init_general_PVs(aps_start_pv, aps_file_name_pv, detector_prefix):
               file=sys.stderr)
         return None
 
-    hdf_plugin_prefix = detector_prefix + 'HDF1:'
-    global_PVs['FPFullFileNameRBV'] = PV(hdf_plugin_prefix + 'FullFileName_RBV')
-    global_PVs['FileName']          = PV(hdf_plugin_prefix + 'FileName')
-    global_PVs['NumCapture']        = PV(hdf_plugin_prefix + 'NumCapture')
-    global_PVs['Capture']           = PV(hdf_plugin_prefix + 'Capture')
+    if file_format == "hdf":
+        plugin_prefix = detector_prefix + 'HDF1:'
+    else:
+        plugin_prefix = detector_prefix + 'TIFF1:'
+
+    global_PVs['FPFullFileNameRBV'] = PV(plugin_prefix + 'FullFileName_RBV')
+    global_PVs['FileName']          = PV(plugin_prefix + 'FileName')
+    global_PVs['NumCapture']        = PV(plugin_prefix + 'NumCapture')
+    global_PVs['Capture']           = PV(plugin_prefix + 'Capture')
 
     return global_PVs
 
@@ -154,56 +158,61 @@ def init_detector(global_PVs, n_images):
     global_PVs['Cam1NumImages'].put(n_images, wait=True)
     print('  *** *** set Cam1NumImage to %d' % n_images)
     time.sleep(0.1)
-    print('  *** *** set cam display to 1')
-    global_PVs['Cam1Display'].put(1)
-    print('  *** *** set cam display to 1: done')
-    time.sleep(0.1)
-    print('  *** *** set cam acquire')
-
-
-def arm_hdf_plugin(global_PVs, n_images):
-
+    # print('  *** *** set cam display to 1')
+    # global_PVs['Cam1Display'].put(1)
+    # print('  *** *** set cam display to 1: done')
+    # time.sleep(0.1)
+    # print('  *** *** set cam acquire')
     print(' ')
-    print('  *** init HDF plugin')
-    print('  *** *** set HDF plugin to Done')
-    global_PVs['Capture'].put(HDFIdle, wait=True)
-    print('  *** *** set HDF plugin to Done:  Done')
+    print('  *** init write plugin')
+    print('  *** *** set write plugin to Done')
+    global_PVs['Capture'].put(FilePluginIdle, wait=True)
+    print('  *** *** set write plugin to Done:  Done')
     time.sleep(0.1)
-    print('  *** *** set HDF NumCapture')
+    print('  *** *** set write NumCapture')
     global_PVs['NumCapture'].put(n_images, wait=True)
-    print('  *** *** set HDF NumCapture to %d' % n_images)
+    print('  *** *** set write NumCapture to %d' % n_images)
     time.sleep(0.1)
+
+def arm_write_plugin(global_PVs, n_images):
 
     raw_str = global_PVs['APSFileName'].get()
     base_filename = sanitize_filename(raw_str)
     now_str = datetime.now().isoformat(timespec="seconds").replace(":", "-")
     filename = f"{base_filename}_{now_str}"
-    global_PVs['FileName'].put(filename)
+    global_PVs['FileName'].put(filename, wait=True)
     time.sleep(0.1)
-    print('  *** *** arm HDF plugin')
-    global_PVs['Capture'].put(HDFCapture)
-    wait_pv(global_PVs['Capture'], HDFCapture, 2)
-    print('  *** *** HDF plugin: armed')
+    print('  *** *** arm write plugin')
+    global_PVs['Capture'].put(WritePluginCapture)
+    # wait_pv(global_PVs['Capture'], WritePluginCapture, 5)
+    print('  *** *** write plugin: armed')
 
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Configure 2bmSP2 detector, HDF plugin, and start on APS start PV."
+        description="Configure 2bmSP1 detector, write plugin, and start on APS start PV."
     )
     parser.add_argument(
         "--aps-start-pv",
-        default="OPS:message17",
+        # default="OPS:message17",
+        default="2bmb:TomoScan:UserBadge",
         help="PV to monitor for start command (default: OPS:message17)",
     )
     parser.add_argument(
         "--aps-filename-pv",
-        default="OPS:message6",
+        # default="OPS:message6",
+        default="2bmb:TomoScan:ESAFNumber",
         help="PV providing base filename (default: OPS:message6)",
     )
     parser.add_argument(
         "--detector-prefix",
-        default="2bmSP2:",
-        help="Detector prefix (default: 2bmSP2:)",
+        default="2bmSP1:",
+        help="Detector prefix (default: 2bmSP1:)",
+    )
+    parser.add_argument(
+        "--file-format",
+        default="hdf",
+        help="Detector plugin used (option are tiff or hdf) (default: hdf)",
     )
     parser.add_argument(
         "--number-of-images",
@@ -227,6 +236,7 @@ def main():
         args.aps_start_pv,
         args.aps_filename_pv,
         args.detector_prefix,
+        args.file_format
     )
     if pv is None:
         sys.exit(1)
@@ -247,8 +257,9 @@ def main():
 
                 # Detect rising edge: was not start, now is start
                 if is_start and not last_is_start:
-                    print('  *** APSStart changed to "start": arming HDF plugin')
-                    arm_hdf_plugin(pv, args.number_of_images)
+                    print('  *** APSStart changed to "start": arming write plugin')
+                    arm_write_plugin(pv, args.number_of_images)
+                    time.sleep(1)
                     print('  *** APSStart changed to "start": starting acquisition')
                     pv['Cam1Acquire'].put(DetectorAcquire)
                     wait_pv(pv['Cam1Acquire'], DetectorAcquire, 2)
