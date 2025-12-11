@@ -2,16 +2,21 @@ import time
 import re
 import sys
 import argparse
+import logging
+
 from epics import PV
 from datetime import datetime
 
 EPSILON = 0.1
 
-DetectorIdle = 0
-DetectorAcquire = 1
+DetectorIdle       = 0
+DetectorAcquire    = 1
 
-FilePluginIdle = 0
+FilePluginIdle     = 0
 WritePluginCapture = 1
+
+StartCommand       = 'start'
+
 
 """
 This script:
@@ -35,6 +40,54 @@ This script:
 - This cycle repeats indefinitely until the script is stopped (for example, with Ctrl-C).
 """
 
+logger = logging.getLogger(__name__)
+
+def info(msg, *args, **kwargs):
+    logger.info(msg, *args, **kwargs)
+
+def error(msg, *args, **kwargs):
+    logger.error(msg, *args, **kwargs)
+
+def warning(msg, *args, **kwargs):
+    logger.warning(msg, *args, **kwargs)
+
+def debug(msg, *args, **kwargs):
+    logger.debug(msg, *args, **kwargs)
+
+def setup_custom_logger(lfname=None, stream_to_console=True):
+
+    logger.setLevel(logging.DEBUG)
+
+    if (lfname != None):
+        fHandler = logging.FileHandler(lfname)
+        file_formatter = logging.Formatter('%(asctime)s - %(levelname)s: %(message)s')
+        fHandler.setFormatter(file_formatter)
+        logger.addHandler(fHandler)
+    if stream_to_console:
+        ch = logging.StreamHandler()
+        ch.setFormatter(ColoredLogFormatter('%(asctime)s - %(message)s'))
+        ch.setLevel(logging.DEBUG)
+        logger.addHandler(ch)
+
+class ColoredLogFormatter(logging.Formatter):
+    def __init__(self, fmt, datefmt=None, style='%'):
+        # Logging defines
+        self.__GREEN = "\033[92m"
+        self.__RED = '\033[91m'
+        self.__YELLOW = '\033[33m'
+        self.__ENDC = '\033[0m'
+        super().__init__(fmt, datefmt, style)
+    
+    
+    def formatMessage(self,record):
+        if record.levelname=='INFO':
+            record.message = self.__GREEN + record.message + self.__ENDC
+        elif record.levelname == 'WARNING':
+            record.message = self.__YELLOW + record.message + self.__ENDC
+        elif record.levelname == 'ERROR':
+            record.message = self.__RED + record.message + self.__ENDC
+        return super().formatMessage(record)
+
 def wait_pv(pv, wait_val, max_timeout_sec=-1):
 
     # wait on a pv to be a value until max_timeout (default forever)
@@ -52,11 +105,10 @@ def wait_pv(pv, wait_val, max_timeout_sec=-1):
                 diffTime = curTime - startTime
                 if diffTime >= max_timeout_sec:
                     # log is not defined, so print to stderr
-                    print('ERROR: dropped images', file=sys.stderr)
-                    print(
+                    error('ERROR: dropped images')
+                    error(
                         'wait_pv(%s, %d, %5.2f) timed out; returning False'
-                        % (pv.pvname, wait_val, max_timeout_sec),
-                        file=sys.stderr,
+                        % (pv.pvname, wait_val, max_timeout_sec)
                     )
                     return False
             time.sleep(.01)
@@ -112,8 +164,7 @@ def init_general_PVs(aps_start_pv, aps_file_name_pv, detector_prefix, file_forma
         global_PVs['Cam1TriggerSelector']   = PV(camera_prefix + 'TriggerSelector')
         global_PVs['Cam1TriggerActivation'] = PV(camera_prefix + 'TriggerActivation')
     else:
-        print('Detector %s (model %s) is not supported' % (manufacturer, model),
-              file=sys.stderr)
+        error('Detector %s (model %s) is not supported' % (manufacturer, model))
         return None
 
     if file_format == "hdf":
@@ -139,33 +190,33 @@ def sanitize_filename(name, max_length=255):
 
 
 def init_detector(global_PVs, n_images):
-    print('')
-    print('Init FLIR camera')
-    print('  Setting detector to Idle')
+    info('')
+    info('Init FLIR camera')
+    info('  Setting detector to Idle')
     global_PVs['Cam1Acquire'].put(DetectorIdle)
     wait_pv(global_PVs['Cam1Acquire'], DetectorIdle, 2)
-    print('  Detector is Idle')
+    info('  Detector is Idle')
     time.sleep(0.1)
-    print('  Setting trigger mode to Off')
+    info('  Setting trigger mode to Off')
     global_PVs['Cam1TriggerMode'].put('Off', wait=True)
-    print('  Trigger mode is Off')
+    info('  Trigger mode is Off')
     time.sleep(0.1)
-    print('  Setting image mode to Multiple')
+    info('  Setting image mode to Multiple')
     global_PVs['Cam1ImageMode'].put('Multiple', wait=True)
-    print('  Image mode is Multiple')
+    info('  Image mode is Multiple')
     time.sleep(0.1)
-    print('  Setting number of images')
+    info('  Setting number of images')
     global_PVs['Cam1NumImages'].put(n_images, wait=True)
-    print('  Number of images set to %d' % n_images)
+    info('  Number of images set to %d' % n_images)
     time.sleep(0.1)
-    print('Init write plugin')
-    print('  Setting write plugin to Idle')
+    info('Init write plugin')
+    info('  Setting write plugin to Idle')
     global_PVs['Capture'].put(FilePluginIdle, wait=True)
-    print('  Write plugin is Idle')
+    info('  Write plugin is Idle')
     time.sleep(0.1)
-    print('  Setting NumCapture')
+    info('  Setting NumCapture')
     global_PVs['NumCapture'].put(n_images, wait=True)
-    print('  NumCapture set to %d' % n_images)
+    info('  NumCapture set to %d' % n_images)
     time.sleep(0.1)
 
 def arm_write_plugin(global_PVs, n_images):
@@ -176,55 +227,69 @@ def arm_write_plugin(global_PVs, n_images):
     filename = f"{base_filename}_{now_str}"
     global_PVs['FileName'].put(filename, wait=True)
     time.sleep(0.1)
-    print('  Arming write plugin')
+    info('  Arming write plugin')
     global_PVs['Capture'].put(WritePluginCapture)
     # wait_pv(global_PVs['Capture'], WritePluginCapture, 5)
-    print('  Write plugin armed')
+    info('  Write plugin armed')
 
 
 def parse_args():
+
+    default_aps_start_pv    = "2bmb:TomoScan:UserBadge"
+    # default_aps_start_pv    = "S-INJ:InjectionPeriodCounterM"
+    # default_aps_start_pv    = "OPS:message6"
+    default_aps_filename_pv = "2bmb:TomoScan:ESAFNumber"
+    # default_aps_filename_pv = "OPS:message17"
+    default_detector_prefix = "2bmSP1:"
+    default_file_format     = "hdf"
+    default_num_images      = 10
+
     parser = argparse.ArgumentParser(
         description="Configure 2bmSP1 detector, write plugin, and start on APS start PV."
     )
+
     parser.add_argument(
         "--aps-start-pv",
-        # default="OPS:message17",
-        default="2bmb:TomoScan:UserBadge",
-        help="PV to monitor for start command (default: OPS:message17)",
+        default=default_aps_start_pv,
+        help=f"PV to monitor for start command (default: {default_aps_start_pv})",
     )
     parser.add_argument(
         "--aps-filename-pv",
-        # default="OPS:message6",
-        default="2bmb:TomoScan:ESAFNumber",
-        help="PV providing base filename (default: OPS:message6)",
+        default=default_aps_filename_pv,
+        help=f"PV providing base filename (default: {default_aps_filename_pv})",
     )
     parser.add_argument(
         "--detector-prefix",
-        default="2bmSP1:",
-        help="Detector prefix (default: 2bmSP1:)",
+        default=default_detector_prefix,
+        help=f"Detector prefix (default: {default_detector_prefix})",
     )
     parser.add_argument(
         "--file-format",
-        default="hdf",
-        help="Detector plugin used (option are tiff or hdf) (default: hdf)",
+        default=default_file_format,
+        choices=["tiff", "hdf"],
+        help=f"Detector plugin used (options: tiff, hdf; default: {default_file_format})",
     )
     parser.add_argument(
         "--number-of-images",
         type=int,
-        default=10,
-        help="Number of images to acquire (default: 10)",
+        default=default_num_images,
+        help=f"Number of images to acquire (default: {default_num_images})",
     )
+
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
 
-    print("Parameters:")
-    print(f"  APS start PV     : {args.aps_start_pv}")
-    print(f"  APS filename PV  : {args.aps_filename_pv}")
-    print(f"  Detector prefix  : {args.detector_prefix}")
-    print(f"  Number of images : {args.number_of_images}")
+    # This is just to print nice logger messages
+    setup_custom_logger()
+
+    info("Parameters:")
+    info(f"  APS start PV     : {args.aps_start_pv}")
+    info(f"  APS filename PV  : {args.aps_filename_pv}")
+    info(f"  Detector prefix  : {args.detector_prefix}")
+    info(f"  Number of images : {args.number_of_images}")
 
     pv = init_general_PVs(
         args.aps_start_pv,
@@ -240,30 +305,30 @@ def main():
 
     # Edge-triggered monitoring:
     # Only trigger when APSStart transitions from non-start -> start.
-    print('Monitoring APSStart for "start" command')
+    info('Monitoring APSStart for "start" command')
     try:
         last_is_start = False
         while True:
             val = pv['APSStart'].get(as_string=True)
             if val is not None:
                 val_str = str(val).strip()
-                is_start = (val_str.lower() == 'start')
+                is_start = (val_str.lower() == StartCommand)
 
                 # Detect rising edge: was not start, now is start
                 if is_start and not last_is_start:
-                    print('APSStart changed to "start": arming write plugin')
+                    info('APSStart changed to "start": arming write plugin')
                     arm_write_plugin(pv, args.number_of_images)
                     time.sleep(1)
-                    print('APSStart changed to "start": starting acquisition')
+                    info('APSStart changed to "start": starting acquisition')
                     pv['Cam1Acquire'].put(DetectorAcquire)
                     wait_pv(pv['Cam1Acquire'], DetectorAcquire, 2)
-                    print('Acquisition complete; returning to monitoring')
+                    info('Acquisition complete; returning to monitoring')
 
                 last_is_start = is_start
 
             time.sleep(0.1)
     except KeyboardInterrupt:
-        print('\nMonitoring stopped by user')
+        info('\nMonitoring stopped by user')
 
 
 if __name__ == "__main__":
