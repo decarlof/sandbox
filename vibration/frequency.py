@@ -1,6 +1,8 @@
 import numpy as np
 from skimage.registration import phase_cross_correlation
 import argparse
+import h5py
+import os
 
 def extract_vibration_frequency(data, sampling_rate=1000, upsample=100):
     """
@@ -48,7 +50,7 @@ def extract_vibration_frequency(data, sampling_rate=1000, upsample=100):
 
 def main():
     parser = argparse.ArgumentParser(description="Extract vibration frequency from a stack of images.")
-    parser.add_argument("file", type=str, help="Path to .npy file containing the 3D data array (n, y, x).")
+    parser.add_argument("file", type=str, help="Path to .npy or .h5/.hdf5 file containing the 3D data array.")
     parser.add_argument("--sampling_rate", type=float, default=1000.0,
                         help="Acquisition sampling rate in Hz (default: 1000 Hz).")
     parser.add_argument("--upsample", type=int, default=100,
@@ -58,7 +60,13 @@ def main():
 
     # Load data
     print(f"Loading data from {args.file} ...")
-    data = np.load(args.file)
+    ext = os.path.splitext(args.file)[1].lower()
+
+    if ext in [".h5", ".hdf5"]:
+        with h5py.File(args.file, "r") as f:
+            data = f["/exchange/data"][:]  # read into memory
+    else:
+        data = np.load(args.file)
 
     # Compute frequency
     peak_freq, shifts, freqs, fft_mag = extract_vibration_frequency(
@@ -73,4 +81,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
