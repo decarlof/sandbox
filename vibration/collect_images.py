@@ -52,9 +52,9 @@ def wait_pv(pv, wait_val, max_timeout_sec=-1):
                 diffTime = curTime - startTime
                 if diffTime >= max_timeout_sec:
                     # log is not defined, so print to stderr
-                    print('  *** ERROR: DROPPED IMAGES ***', file=sys.stderr)
+                    print('ERROR: dropped images', file=sys.stderr)
                     print(
-                        '  *** wait_pv(%s, %d, %5.2f) reached max timeout. Return False'
+                        'wait_pv(%s, %d, %5.2f) timed out; returning False'
                         % (pv.pvname, wait_val, max_timeout_sec),
                         file=sys.stderr,
                     )
@@ -112,7 +112,7 @@ def init_general_PVs(aps_start_pv, aps_file_name_pv, detector_prefix, file_forma
         global_PVs['Cam1TriggerSelector']   = PV(camera_prefix + 'TriggerSelector')
         global_PVs['Cam1TriggerActivation'] = PV(camera_prefix + 'TriggerActivation')
     else:
-        print('Detector %s model %s is not supported' % (manufacturer, model),
+        print('Detector %s (model %s) is not supported' % (manufacturer, model),
               file=sys.stderr)
         return None
 
@@ -139,39 +139,33 @@ def sanitize_filename(name, max_length=255):
 
 
 def init_detector(global_PVs, n_images):
-    print(' ')
-    print('  *** init FLIR camera')
-    print('  *** *** set detector to idle')
+    print('')
+    print('Init FLIR camera')
+    print('  Setting detector to Idle')
     global_PVs['Cam1Acquire'].put(DetectorIdle)
     wait_pv(global_PVs['Cam1Acquire'], DetectorIdle, 2)
-    print('  *** *** set detector to idle:  Done')
+    print('  Detector is Idle')
     time.sleep(0.1)
-    print('  *** *** set trigger mode to Off')
+    print('  Setting trigger mode to Off')
     global_PVs['Cam1TriggerMode'].put('Off', wait=True)
-    print('  *** *** set trigger mode to Off: done')
+    print('  Trigger mode is Off')
     time.sleep(0.1)
-    print('  *** *** set image mode to Multiple')
+    print('  Setting image mode to Multiple')
     global_PVs['Cam1ImageMode'].put('Multiple', wait=True)
-    print('  *** *** set image mode to Multiple: done')
+    print('  Image mode is Multiple')
     time.sleep(0.1)
-    print('  *** *** set Cam1NumImages')
+    print('  Setting number of images')
     global_PVs['Cam1NumImages'].put(n_images, wait=True)
-    print('  *** *** set Cam1NumImage to %d' % n_images)
+    print('  Number of images set to %d' % n_images)
     time.sleep(0.1)
-    # print('  *** *** set cam display to 1')
-    # global_PVs['Cam1Display'].put(1)
-    # print('  *** *** set cam display to 1: done')
-    # time.sleep(0.1)
-    # print('  *** *** set cam acquire')
-    print(' ')
-    print('  *** init write plugin')
-    print('  *** *** set write plugin to Done')
+    print('Init write plugin')
+    print('  Setting write plugin to Idle')
     global_PVs['Capture'].put(FilePluginIdle, wait=True)
-    print('  *** *** set write plugin to Done:  Done')
+    print('  Write plugin is Idle')
     time.sleep(0.1)
-    print('  *** *** set write NumCapture')
+    print('  Setting NumCapture')
     global_PVs['NumCapture'].put(n_images, wait=True)
-    print('  *** *** set write NumCapture to %d' % n_images)
+    print('  NumCapture set to %d' % n_images)
     time.sleep(0.1)
 
 def arm_write_plugin(global_PVs, n_images):
@@ -182,10 +176,10 @@ def arm_write_plugin(global_PVs, n_images):
     filename = f"{base_filename}_{now_str}"
     global_PVs['FileName'].put(filename, wait=True)
     time.sleep(0.1)
-    print('  *** *** arm write plugin')
+    print('  Arming write plugin')
     global_PVs['Capture'].put(WritePluginCapture)
     # wait_pv(global_PVs['Capture'], WritePluginCapture, 5)
-    print('  *** *** write plugin: armed')
+    print('  Write plugin armed')
 
 
 def parse_args():
@@ -226,7 +220,7 @@ def parse_args():
 def main():
     args = parse_args()
 
-    print("Using parameters:")
+    print("Parameters:")
     print(f"  APS start PV     : {args.aps_start_pv}")
     print(f"  APS filename PV  : {args.aps_filename_pv}")
     print(f"  Detector prefix  : {args.detector_prefix}")
@@ -246,7 +240,7 @@ def main():
 
     # Edge-triggered monitoring:
     # Only trigger when APSStart transitions from non-start -> start.
-    print('  *** monitoring APSStart for start command ...')
+    print('Monitoring APSStart for "start" command')
     try:
         last_is_start = False
         while True:
@@ -257,20 +251,19 @@ def main():
 
                 # Detect rising edge: was not start, now is start
                 if is_start and not last_is_start:
-                    print('  *** APSStart changed to "start": arming write plugin')
+                    print('APSStart changed to "start": arming write plugin')
                     arm_write_plugin(pv, args.number_of_images)
                     time.sleep(1)
-                    print('  *** APSStart changed to "start": starting acquisition')
+                    print('APSStart changed to "start": starting acquisition')
                     pv['Cam1Acquire'].put(DetectorAcquire)
                     wait_pv(pv['Cam1Acquire'], DetectorAcquire, 2)
-                    print('  *** *** set cam acquire: done')
-                    print('  *** acquisition complete, returning to idle monitoring')
+                    print('Acquisition complete; returning to monitoring')
 
                 last_is_start = is_start
 
             time.sleep(0.1)
     except KeyboardInterrupt:
-        print('\n  *** monitoring stopped by user')
+        print('\nMonitoring stopped by user')
 
 
 if __name__ == "__main__":
