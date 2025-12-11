@@ -10,17 +10,17 @@ EPSILON = 0.1
 DetectorIdle = 0
 DetectorAcquire = 1
 
-TIFFIdle = 0
-TIFFCapture = 1
+HDFIdle = 0
+HDFCapture = 1
 
 """
 This script:
 
-- Configures an areadetector and TIFF1 plugin once at startup:
+- Configures an areadetector and HDF1 plugin once at startup:
   - Sets the number of images to acquire.
   - Sets the detector image mode to Multiple.
-  - Sets the TIFF1 plugin NumCapture to match the number of images.
-  - Builds an TIFF filename from a PV, e.g. OPS:message6 plus a timestamp.
+  - Sets the HDF1 plugin NumCapture to match the number of images.
+  - Builds an HDF filename from a PV, e.g. OPS:message6 plus a timestamp.
 
 - Then idles, monitoring a trigger PV e.g. OPS:message17.
 
@@ -116,11 +116,11 @@ def init_general_PVs(aps_start_pv, aps_file_name_pv, detector_prefix):
               file=sys.stderr)
         return None
 
-    tiff_plugin_prefix = detector_prefix + 'TIFF1:'
-    global_PVs['FPFullFileNameRBV'] = PV(tiff_plugin_prefix + 'FullFileName_RBV')
-    global_PVs['FileName']          = PV(tiff_plugin_prefix + 'FileName')
-    global_PVs['NumCapture']        = PV(tiff_plugin_prefix + 'NumCapture')
-    global_PVs['Capture']           = PV(tiff_plugin_prefix + 'Capture')
+    hdf_plugin_prefix = detector_prefix + 'HDF1:'
+    global_PVs['FPFullFileNameRBV'] = PV(hdf_plugin_prefix + 'FullFileName_RBV')
+    global_PVs['FileName']          = PV(hdf_plugin_prefix + 'FileName')
+    global_PVs['NumCapture']        = PV(hdf_plugin_prefix + 'NumCapture')
+    global_PVs['Capture']           = PV(hdf_plugin_prefix + 'Capture')
 
     return global_PVs
 
@@ -154,56 +154,56 @@ def init_detector(global_PVs, n_images):
     global_PVs['Cam1NumImages'].put(n_images, wait=True)
     print('  *** *** set Cam1NumImage to %d' % n_images)
     time.sleep(0.1)
-    # print('  *** *** set cam display to 1')
-    # global_PVs['Cam1Display'].put(1)
-    # print('  *** *** set cam display to 1: done')
-    # time.sleep(0.1)
-    # print('  *** *** set cam acquire')
-    print(' ')
-    print('  *** init TIFF plugin')
-    print('  *** *** set TIFF plugin to Done')
-    global_PVs['Capture'].put(TIFFIdle, wait=True)
-    print('  *** *** set TIFF plugin to Done:  Done')
+    print('  *** *** set cam display to 1')
+    global_PVs['Cam1Display'].put(1)
+    print('  *** *** set cam display to 1: done')
     time.sleep(0.1)
-    print('  *** *** set TIFF NumCapture')
-    global_PVs['NumCapture'].put(n_images, wait=True)
-    print('  *** *** set TIFF NumCapture to %d' % n_images)
-    time.sleep(0.1)
+    print('  *** *** set cam acquire')
+
 
 def arm_hdf_plugin(global_PVs, n_images):
+
+    print(' ')
+    print('  *** init HDF plugin')
+    print('  *** *** set HDF plugin to Done')
+    global_PVs['Capture'].put(HDFIdle, wait=True)
+    print('  *** *** set HDF plugin to Done:  Done')
+    time.sleep(0.1)
+    print('  *** *** set HDF NumCapture')
+    global_PVs['NumCapture'].put(n_images, wait=True)
+    print('  *** *** set HDF NumCapture to %d' % n_images)
+    time.sleep(0.1)
 
     raw_str = global_PVs['APSFileName'].get()
     base_filename = sanitize_filename(raw_str)
     now_str = datetime.now().isoformat(timespec="seconds").replace(":", "-")
     filename = f"{base_filename}_{now_str}"
-    global_PVs['FileName'].put(filename, wait=True)
+    global_PVs['FileName'].put(filename)
     time.sleep(0.1)
-    print('  *** *** arm TIFF plugin')
-    global_PVs['Capture'].put(TIFFCapture)
-    wait_pv(global_PVs['Capture'], TIFFCapture, 2)
-    print('  *** *** TIFF plugin: armed')
+    print('  *** *** arm HDF plugin')
+    global_PVs['Capture'].put(HDFCapture)
+    wait_pv(global_PVs['Capture'], HDFCapture, 2)
+    print('  *** *** HDF plugin: armed')
 
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Configure 2bmSP1 detector, TIFF plugin, and start on APS start PV."
+        description="Configure 2bmSP2 detector, HDF plugin, and start on APS start PV."
     )
     parser.add_argument(
         "--aps-start-pv",
-        # default="OPS:message17",
-        default="2bmb:TomoScan:UserBadge",
+        default="OPS:message17",
         help="PV to monitor for start command (default: OPS:message17)",
     )
     parser.add_argument(
         "--aps-filename-pv",
-        # default="OPS:message6",
-        default="2bmb:TomoScan:ESAFNumber",
+        default="OPS:message6",
         help="PV providing base filename (default: OPS:message6)",
     )
     parser.add_argument(
         "--detector-prefix",
-        default="2bmSP1:",
-        help="Detector prefix (default: 2bmSP1:)",
+        default="2bmSP2:",
+        help="Detector prefix (default: 2bmSP2:)",
     )
     parser.add_argument(
         "--number-of-images",
@@ -247,9 +247,8 @@ def main():
 
                 # Detect rising edge: was not start, now is start
                 if is_start and not last_is_start:
-                    print('  *** APSStart changed to "start": arming TIFF plugin')
+                    print('  *** APSStart changed to "start": arming HDF plugin')
                     arm_hdf_plugin(pv, args.number_of_images)
-                    time.sleep(1)
                     print('  *** APSStart changed to "start": starting acquisition')
                     pv['Cam1Acquire'].put(DetectorAcquire)
                     wait_pv(pv['Cam1Acquire'], DetectorAcquire, 2)
