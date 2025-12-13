@@ -21,7 +21,7 @@ plt.figure(figsize=(8, 5))
 plt.plot(Y_19mm, dPin_19mm, marker='o', linestyle='-', label='ΔX = 1.9 mm')
 
 plt.xlabel('Y Hexapod (mm)')
-plt.ylabel('ΔPin (µm)')
+plt.ylabel('ΔPin (pixels)')
 plt.title('ΔPin vs Y Hexapod for ΔX = 1.9 mm')
 plt.grid(True)
 plt.legend()
