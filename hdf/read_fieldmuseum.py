@@ -5,6 +5,7 @@ import h5py
 import h5py as h5
 import logging
 import numpy as np
+import tifffile
 
 logger = logging.getLogger(__name__)
 
@@ -135,15 +136,23 @@ def _make_slice_object_a_tuple(slc):
 
 def main():
 
-    folder = '/Users/decarlo/Downloads/'
+    # folder = '/local/dataraid/FieldMuseum/Sam01_Stub_319_Flower/reconstructed/converted/'
+    # folder = '/local/dataraid/FieldMuseum/Sam02 Stub 320_Flower/reconstructed/converted/'
+    # folder = '/local/dataraid/FieldMuseum/Sam03 Stub 322_Flower/reconstructed/converted'
+    # folder = '/local/dataraid/FieldMuseum/Sam04 Stub 323_Flower/reconstructed/converted'
+    # folder = '/local/dataraid/FieldMuseum/Sam05 Stub 324_Flower/reconstructed/converted'
+    folder = '/local/dataraid/FieldMuseum/Sam11 Stub 321_Flower/reconstructed/converted'
     for fname in os.listdir(folder):
-        if fname.lower().endswith(".hdf"):   # only .hdf files
+        if fname.lower().endswith(".h5"):   # only hdf files
             fpath = os.path.join(folder, fname)
             if os.path.isfile(fpath):        # skip directories
-                print("Processing:", fpath)
-                array = read_hdf5(fname, dataset='/entry1/data', slc=None, dtype=None, shared=False)
-                print(array.shape)
-
+                print("Reading:", fpath)
+                data = read_hdf5(fpath, dataset='/entry1/data', slc=None, dtype=None, shared=False)
+                print(data.shape)
+                full_path = os.path.join(folder, fname)
+                tfname = os.path.splitext(full_path)[0] + ".tiff"
+                print("Saving:", tfname)
+                tifffile.imwrite(tfname, data)
 
 if __name__ == '__main__':
     main()
