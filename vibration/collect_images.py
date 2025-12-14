@@ -147,6 +147,7 @@ def init_general_PVs(aps_start_pv, aps_file_name_pv, detector_prefix, file_forma
     global_PVs['Cam1MaxSizeX_RBV']    = PV(camera_prefix + 'MaxSizeX_RBV')
     global_PVs['Cam1MaxSizeY_RBV']    = PV(camera_prefix + 'MaxSizeY_RBV')
     global_PVs['Cam1PixelFormat_RBV'] = PV(camera_prefix + 'PixelFormat_RBV')
+    global_PVs['Cam1ArrayRate_RBV']   = PV(camera_prefix + 'ArrayRate_RBV')
 
     image_prefix = detector_prefix + 'image1:'
     global_PVs['Image']       = PV(image_prefix + 'ArrayData')
@@ -219,12 +220,13 @@ def init_detector(global_PVs, n_images):
     info('  NumCapture set to %d' % n_images)
     time.sleep(0.1)
 
-def arm_write_plugin(global_PVs, n_images):
+def arm_write_plugin(global_PVs, n_images, fps):
 
     raw_str = global_PVs['APSFileName'].get()
     base_filename = sanitize_filename(raw_str)
     now_str = datetime.now().isoformat(timespec="seconds").replace(":", "-")
-    filename = f"{base_filename}_{now_str}"
+    # filename = f"{base_filename}_{now_str}"
+    filename = f"{base_filename}_{n_images}frms_{fps}fps"
     global_PVs['FileName'].put(filename, wait=True)
     time.sleep(0.1)
     info('  Arming write plugin')
@@ -232,6 +234,25 @@ def arm_write_plugin(global_PVs, n_images):
     # wait_pv(global_PVs['Capture'], WritePluginCapture, 5)
     info('  Write plugin armed')
 
+def measure_fps(global_PVs):
+
+    info('  Setting image mode to Continuous')
+    global_PVs['Cam1ImageMode'].put('Continuous', wait=True)
+    time.sleep(0.1)
+    global_PVs['Cam1Acquire'].put(DetectorAcquire)
+    time.sleep(2)
+    fps = global_PVs['Cam1ArrayRate_RBV'].get()
+    global_PVs['Cam1Acquire'].put(DetectorIdle)
+    info('  Setting image mode to Multiple')
+    global_PVs['Cam1ImageMode'].put('Multiple', wait=True)
+    info('  Image mode is Multiple')
+    time.sleep(0.1)
+
+    info('APSStart changed to "start": starting acquisition')
+    global_PVs['Cam1Acquire'].put(DetectorAcquire)
+    wait_pv(global_PVs['Cam1Acquire'], DetectorAcquire, 2)
+    warning('  Frame rate: %d' % fps)
+    return int(fps)
 
 def parse_args():
 
@@ -303,6 +324,8 @@ def main():
     # Initialize once at startup
     init_detector(pv, args.number_of_images)
 
+    fps = measure_fps(pv)
+
     # Edge-triggered monitoring:
     # Only trigger when APSStart transitions from non-start -> start.
     info('Monitoring APSStart for "start" command')
@@ -317,7 +340,7 @@ def main():
                 # Detect rising edge: was not start, now is start
                 if is_start and not last_is_start:
                     info('APSStart changed to "start": arming write plugin')
-                    arm_write_plugin(pv, args.number_of_images)
+                    arm_write_plugin(pv, args.number_of_images, fps)
                     time.sleep(1)
                     info('APSStart changed to "start": starting acquisition')
                     pv['Cam1Acquire'].put(DetectorAcquire)
