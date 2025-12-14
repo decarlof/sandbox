@@ -247,10 +247,6 @@ def measure_fps(global_PVs):
     global_PVs['Cam1ImageMode'].put('Multiple', wait=True)
     info('  Image mode is Multiple')
     time.sleep(0.1)
-
-    info('APSStart changed to "start": starting acquisition')
-    global_PVs['Cam1Acquire'].put(DetectorAcquire)
-    wait_pv(global_PVs['Cam1Acquire'], DetectorAcquire, 2)
     warning('  Frame rate: %d' % fps)
     return int(fps)
 
@@ -335,8 +331,7 @@ def main():
             val = pv['APSStart'].get(as_string=True)
             if val is not None:
                 val_str = str(val).strip()
-                is_start = (val_str.lower() == StartCommand)
-
+                is_start = (val_str.lower() == StartCommand.lower())
                 # Detect rising edge: was not start, now is start
                 if is_start and not last_is_start:
                     info('APSStart changed to "start": arming write plugin')
