@@ -15,7 +15,7 @@ DetectorAcquire    = 1
 FilePluginIdle     = 0
 WritePluginCapture = 1
 
-StartCommand       = 'start'
+StartCommand       = 'Acquire'
 
 
 """
