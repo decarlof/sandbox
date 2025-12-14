@@ -15,7 +15,7 @@ DetectorAcquire    = 1
 FilePluginIdle     = 0
 WritePluginCapture = 1
 
-AcquireCommand       = 'Acquire'
+StartCommand       = 'start'
 
 
 """
@@ -257,9 +257,10 @@ def measure_fps(global_PVs):
 def parse_args():
 
     default_aps_start_pv    = "2bmb:TomoScan:UserBadge"
-    # default_aps_start_pv    = "OPS:message8"                          #  Acquire or Wait
+    # default_aps_start_pv    = "S-INJ:InjectionPeriodCounterM"
+    # default_aps_start_pv    = "OPS:message6"
     default_aps_filename_pv = "2bmb:TomoScan:ESAFNumber"
-    # default_aps_filename_pv = "OPS:message7"                          #  filename root
+    # default_aps_filename_pv = "OPS:message17"
     default_detector_prefix = "2bmSP1:"
     default_file_format     = "hdf"
     default_num_images      = 10
@@ -334,7 +335,7 @@ def main():
             val = pv['APSStart'].get(as_string=True)
             if val is not None:
                 val_str = str(val).strip()
-                is_start = (val_str.lower() == AcquireCommand)
+                is_start = (val_str.lower() == StartCommand)
 
                 # Detect rising edge: was not start, now is start
                 if is_start and not last_is_start:
