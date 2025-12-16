@@ -1,3 +1,4 @@
+import csv
 import numpy as np
 import argparse
 import h5py
@@ -239,7 +240,17 @@ def main():
         action="store_true",
         help="Plot position signal and spectrum for each file (may be slow).",
     )
-
+    parser.add_argument(
+        "--summary_csv",
+        type=str,
+        default="summary.csv",
+        help="CSV file to write summary_rows to (default: summary.csv).",
+    )
+    parser.add_argument(
+        "--plot_from_csv",
+        action="store_true",
+        help="Read summary rows from CSV and plot without recomputing frequencies.",
+    )
     args = parser.parse_args()
 
     folder = args.folder
@@ -328,7 +339,7 @@ def main():
 
         # Add to summary
         # summary_rows.append((fname, vent_freq, res_freq))
-        summary_rows.append((fname, meta_dict['/measurement/instrument/detector/frame_rate'][0], meta_dict['/process/acquisition/start_date'], vent_freq, res_freq))
+        summary_rows.append((fname, meta_dict['/measurement/instrument/detector/frame_rate'][0], meta_dict['/process/acquisition/start_date'][0], vent_freq, res_freq))
 
     # # Print summary table at the end
     # print("\n====================== Summary table ======================")
@@ -338,7 +349,16 @@ def main():
     #     print("{:<40s} {:>18.3f} {:>22.3f}".format(fname, vent_freq, res_freq))
     # print("===========================================================\n")
 
-
+    # If we computed summary_rows in this run (not in plot-from-csv mode), save them
+    if not args.plot_from_csv:
+        csv_path = os.path.join(folder, args.summary_csv)
+        with open(csv_path, "w", newline="") as f:
+            writer = csv.writer(f)
+            # header
+            writer.writerow(["file", "fps", "start_date", "vent_peak", "res_peak"])
+            for fname, frame_rate, start_date, vent_freq, res_freq in summary_rows:
+                writer.writerow([fname, frame_rate, start_date, vent_freq, res_freq])
+        print(f"Saved summary to {csv_path}")
     print("\n====================== Summary table ======================")
     print(
         "{:<40s} {:>10s} {:>22s} {:>18s} {:>22s}".format(
@@ -363,26 +383,26 @@ def main():
     # -----------------------------------------------------------
     # Plot peaks vs start_date
     # -----------------------------------------------------------
-    # Parse dates and collect y-values
     times = []
     vent_peaks = []
     res_peaks = []
 
     for _, _, start_date, vent_freq, res_freq in summary_rows:
-        # Convert start_date string to datetime; adjust parsing as needed
-        if isinstance(start_date, bytes):
-            start_date = start_date.decode("utf-8")
+        # start_date is now already a string like '2025-12-14T18:42:28-0600'
         start_str = str(start_date).strip()
 
-        # Try ISO-like parsing; adjust if your format is different
-        # Example accepted formats: "2024-12-14T10:35:00", "2024-12-14 10:35:00"
+        # Normalize timezone: '...-0600' -> '...-06:00' so fromisoformat can parse it
+        # We assume the last 5 chars are like ±HHMM (e.g. -0600, +0100)
+        if len(start_str) >= 5 and start_str[-5] in ['+', '-'] and start_str[-3] != ':':
+            # example: '2025-12-14T18:42:28-0600' -> '2025-12-14T18:42:28-06:00'
+            start_str = start_str[:-2] + ':' + start_str[-2:]
+
+        # Also accept space instead of 'T'
+        if "T" not in start_str and " " in start_str:
+            start_str = start_str.replace(" ", "T")
+
         try:
-            # Replace space with 'T' if needed
-            if "T" not in start_str and " " in start_str:
-                start_str_iso = start_str.replace(" ", "T")
-            else:
-                start_str_iso = start_str
-            dt = datetime.fromisoformat(start_str_iso)
+            dt = datetime.fromisoformat(start_str)
         except ValueError:
             # If parsing fails, skip this point
             continue
@@ -391,25 +411,25 @@ def main():
         vent_peaks.append(vent_freq)
         res_peaks.append(res_freq)
 
-        if times:
-            fig, ax = plt.subplots(figsize=(10, 5))
+    if times:
+        fig, ax = plt.subplots(figsize=(10, 5))
 
-            ax.plot(times, vent_peaks, "-o", label="Peak [25.0, 35.0] Hz")
-            ax.plot(times, res_peaks, "-o", label="Peak [35.0,100.0] Hz")
+        ax.plot(times, vent_peaks, "-o", label="Peak [25.0, 35.0] Hz")
+        ax.plot(times, res_peaks, "-o", label="Peak [35.0,100.0] Hz")
 
-            ax.set_xlabel("Start date/time")
-            ax.set_ylabel("Frequency [Hz]")
-            ax.set_title("Vibration peaks vs acquisition start time")
-            ax.legend()
+        ax.set_xlabel("Start date/time")
+        ax.set_ylabel("Frequency [Hz]")
+        ax.set_title("Vibration peaks vs acquisition start time")
+        ax.legend()
 
-            # Format x-axis nicely for dates
-            ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d\n%H:%M"))
-            fig.autofmt_xdate()
+        # Format x-axis nicely for dates
+        ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d\n%H:%M"))
+        fig.autofmt_xdate()
 
-            plt.tight_layout()
-            plt.show()
-        else:
-            print("No valid start_date values to plot.\n")
+        plt.tight_layout()
+        plt.show()
+    else:
+        print("No valid start_date values to plot.\n")
 
 
 if __name__ == "__main__":
