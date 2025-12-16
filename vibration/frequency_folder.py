@@ -1,14 +1,17 @@
 import numpy as np
-from skimage.registration import phase_cross_correlation
 import argparse
 import h5py
 import os
 import glob
 import meta
-
+import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
+
+from skimage.registration import phase_cross_correlation
 from matplotlib.widgets import Slider
 from scipy.signal import detrend, windows
+from datetime import datetime
+
 
 # ----------------------------------------------------------------------
 # Primary method: position-based
