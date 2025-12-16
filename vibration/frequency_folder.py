@@ -324,15 +324,89 @@ def main():
             )
 
         # Add to summary
-        summary_rows.append((fname, vent_freq, res_freq))
+        # summary_rows.append((fname, vent_freq, res_freq))
+        summary_rows.append((fname, meta_dict['/measurement/instrument/detector/frame_rate'], meta_dict['/process/acquisition/start_date'] vent_freq, res_freq))
 
-    # Print summary table at the end
+    # # Print summary table at the end
+    # print("\n====================== Summary table ======================")
+    # print("{:<40s} {:>18s} {:>22s}".format("file", "Peak [25.0, 35.0] Hz", "Peak [35.0,100.0] Hz"))
+    # print("-" * 82)
+    # for fname, vent_freq, res_freq in summary_rows:
+    #     print("{:<40s} {:>18.3f} {:>22.3f}".format(fname, vent_freq, res_freq))
+    # print("===========================================================\n")
+
+
     print("\n====================== Summary table ======================")
-    print("{:<40s} {:>18s} {:>22s}".format("file", "Peak [25.0, 35.0] Hz", "Peak [35.0,100.0] Hz"))
-    print("-" * 82)
-    for fname, vent_freq, res_freq in summary_rows:
-        print("{:<40s} {:>18.3f} {:>22.3f}".format(fname, vent_freq, res_freq))
+    print(
+        "{:<40s} {:>10s} {:>22s} {:>18s} {:>22s}".format(
+            "file", "fps", "start_date", "Peak [25.0, 35.0] Hz", "Peak [35.0,100.0] Hz"
+        )
+    )
+    print("-" * 120)
+
+    for fname, frame_rate, start_date, vent_freq, res_freq in summary_rows:
+        print(
+            "{:<40s} {:>10.1f} {:>22s} {:>18.3f} {:>22.3f}".format(
+                fname,
+                frame_rate,
+                str(start_date),
+                vent_freq,
+                res_freq,
+            )
+        )
+
     print("===========================================================\n")
+
+# -----------------------------------------------------------
+# Plot peaks vs start_date
+# -----------------------------------------------------------
+# Parse dates and collect y-values
+times = []
+vent_peaks = []
+res_peaks = []
+
+for _, _, start_date, vent_freq, res_freq in summary_rows:
+    # Convert start_date string to datetime; adjust parsing as needed
+    if isinstance(start_date, bytes):
+        start_date = start_date.decode("utf-8")
+    start_str = str(start_date).strip()
+
+    # Try ISO-like parsing; adjust if your format is different
+    # Example accepted formats: "2024-12-14T10:35:00", "2024-12-14 10:35:00"
+    try:
+        # Replace space with 'T' if needed
+        if "T" not in start_str and " " in start_str:
+            start_str_iso = start_str.replace(" ", "T")
+        else:
+            start_str_iso = start_str
+        dt = datetime.fromisoformat(start_str_iso)
+    except ValueError:
+        # If parsing fails, skip this point
+        continue
+
+    times.append(dt)
+    vent_peaks.append(vent_freq)
+    res_peaks.append(res_freq)
+
+    if times:
+        fig, ax = plt.subplots(figsize=(10, 5))
+
+        ax.plot(times, vent_peaks, "-o", label="Peak [25.0, 35.0] Hz")
+        ax.plot(times, res_peaks, "-o", label="Peak [35.0,100.0] Hz")
+
+        ax.set_xlabel("Start date/time")
+        ax.set_ylabel("Frequency [Hz]")
+        ax.set_title("Vibration peaks vs acquisition start time")
+        ax.legend()
+
+        # Format x-axis nicely for dates
+        ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d\n%H:%M"))
+        fig.autofmt_xdate()
+
+        plt.tight_layout()
+        plt.show()
+    else:
+        print("No valid start_date values to plot.\n")
 
 
 if __name__ == "__main__":
