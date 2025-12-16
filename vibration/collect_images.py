@@ -252,14 +252,11 @@ def measure_fps(global_PVs):
 
 def parse_args():
 
-    # default_aps_start_pv    = "2bmb:TomoScan:UserBadge"
-    # default_aps_start_pv    = "S-INJ:InjectionPeriodCounterM"
     default_aps_start_pv    = "OPS:message8"
-    # default_aps_filename_pv = "2bmb:TomoScan:ESAFNumber"
     default_aps_filename_pv = "OPS:message7"
     default_detector_prefix = "2bmSP1:"
     default_file_format     = "hdf"
-    default_num_images      = 10
+    default_num_images      = 1000
 
     parser = argparse.ArgumentParser(
         description="Configure 2bmSP1 detector, write plugin, and start on APS start PV."
