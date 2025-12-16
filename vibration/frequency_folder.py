@@ -357,56 +357,56 @@ def main():
 
     print("===========================================================\n")
 
-# -----------------------------------------------------------
-# Plot peaks vs start_date
-# -----------------------------------------------------------
-# Parse dates and collect y-values
-times = []
-vent_peaks = []
-res_peaks = []
+    # -----------------------------------------------------------
+    # Plot peaks vs start_date
+    # -----------------------------------------------------------
+    # Parse dates and collect y-values
+    times = []
+    vent_peaks = []
+    res_peaks = []
 
-for _, _, start_date, vent_freq, res_freq in summary_rows:
-    # Convert start_date string to datetime; adjust parsing as needed
-    if isinstance(start_date, bytes):
-        start_date = start_date.decode("utf-8")
-    start_str = str(start_date).strip()
+    for _, _, start_date, vent_freq, res_freq in summary_rows:
+        # Convert start_date string to datetime; adjust parsing as needed
+        if isinstance(start_date, bytes):
+            start_date = start_date.decode("utf-8")
+        start_str = str(start_date).strip()
 
-    # Try ISO-like parsing; adjust if your format is different
-    # Example accepted formats: "2024-12-14T10:35:00", "2024-12-14 10:35:00"
-    try:
-        # Replace space with 'T' if needed
-        if "T" not in start_str and " " in start_str:
-            start_str_iso = start_str.replace(" ", "T")
+        # Try ISO-like parsing; adjust if your format is different
+        # Example accepted formats: "2024-12-14T10:35:00", "2024-12-14 10:35:00"
+        try:
+            # Replace space with 'T' if needed
+            if "T" not in start_str and " " in start_str:
+                start_str_iso = start_str.replace(" ", "T")
+            else:
+                start_str_iso = start_str
+            dt = datetime.fromisoformat(start_str_iso)
+        except ValueError:
+            # If parsing fails, skip this point
+            continue
+
+        times.append(dt)
+        vent_peaks.append(vent_freq)
+        res_peaks.append(res_freq)
+
+        if times:
+            fig, ax = plt.subplots(figsize=(10, 5))
+
+            ax.plot(times, vent_peaks, "-o", label="Peak [25.0, 35.0] Hz")
+            ax.plot(times, res_peaks, "-o", label="Peak [35.0,100.0] Hz")
+
+            ax.set_xlabel("Start date/time")
+            ax.set_ylabel("Frequency [Hz]")
+            ax.set_title("Vibration peaks vs acquisition start time")
+            ax.legend()
+
+            # Format x-axis nicely for dates
+            ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d\n%H:%M"))
+            fig.autofmt_xdate()
+
+            plt.tight_layout()
+            plt.show()
         else:
-            start_str_iso = start_str
-        dt = datetime.fromisoformat(start_str_iso)
-    except ValueError:
-        # If parsing fails, skip this point
-        continue
-
-    times.append(dt)
-    vent_peaks.append(vent_freq)
-    res_peaks.append(res_freq)
-
-    if times:
-        fig, ax = plt.subplots(figsize=(10, 5))
-
-        ax.plot(times, vent_peaks, "-o", label="Peak [25.0, 35.0] Hz")
-        ax.plot(times, res_peaks, "-o", label="Peak [35.0,100.0] Hz")
-
-        ax.set_xlabel("Start date/time")
-        ax.set_ylabel("Frequency [Hz]")
-        ax.set_title("Vibration peaks vs acquisition start time")
-        ax.legend()
-
-        # Format x-axis nicely for dates
-        ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d\n%H:%M"))
-        fig.autofmt_xdate()
-
-        plt.tight_layout()
-        plt.show()
-    else:
-        print("No valid start_date values to plot.\n")
+            print("No valid start_date values to plot.\n")
 
 
 if __name__ == "__main__":
