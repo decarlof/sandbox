@@ -328,7 +328,8 @@ def main():
             val = pv['APSStart'].get(as_string=True)
             if val is not None:
                 val_str = str(val).strip()
-                is_start = (val_str.lower() == StartCommand.lower())
+                # is_start = (val_str.lower() == StartCommand.lower())
+                is_start = val_str.lower().startswith(StartCommand.lower())
                 # Detect rising edge: was not start, now is start
                 if is_start and not last_is_start:
                     info('APSStart changed to "start": arming write plugin')
