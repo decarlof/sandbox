@@ -4,17 +4,18 @@ import argparse
 import h5py
 import os
 import glob
+import meta
+
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
 from scipy.signal import detrend, windows
-
 
 # ----------------------------------------------------------------------
 # Primary method: position-based
 # ----------------------------------------------------------------------
 def extract_vibration_frequency_position(
     data,
-    sampling_rate=162.0,
+    sampling_rate=95.0,
     upsample=100,
     max_frames=100,
     band_low=20.0,
@@ -214,12 +215,6 @@ def main():
         help="Glob pattern to select files in folder (default: *.h5).",
     )
     parser.add_argument(
-        "--sampling_rate",
-        type=float,
-        default=162.0,
-        help="Acquisition rate in Hz (default: 162).",
-    )
-    parser.add_argument(
         "--upsample",
         type=int,
         default=100,
@@ -272,6 +267,11 @@ def main():
         if ext in [".h5", ".hdf5"]:
             with h5py.File(path, "r") as f:
                 data = f["/exchange/data"][:]
+                mp = meta.read_meta.Hdf5MetadataReader(path)
+                meta_dict = mp.readMetadata()
+                mp.close()
+                sampling_rate = meta_dict['/measurement/instrument/detector/frame_rate']
+
         else:
             # For completeness; your current data are .h5
             data = np.load(path)
@@ -284,7 +284,7 @@ def main():
         # Vent band [25, 35] Hz
         vent_freq, positions_v, freqs_v, fft_v = extract_vibration_frequency_position(
             data,
-            sampling_rate=args.sampling_rate,
+            sampling_rate=sampling_rate[0],
             upsample=args.upsample,
             max_frames=args.max_frames,
             band_low=vent_low,
@@ -294,7 +294,7 @@ def main():
         # Resonance band [35, 100] Hz
         res_freq, positions_r, freqs_r, fft_r = extract_vibration_frequency_position(
             data,
-            sampling_rate=args.sampling_rate,
+            sampling_rate=sampling_rate[0],
             upsample=args.upsample,
             max_frames=args.max_frames,
             band_low=res_low,
@@ -318,7 +318,7 @@ def main():
                 positions_r,
                 freqs_r,
                 fft_r,
-                sampling_rate=args.sampling_rate,
+                sampling_rate=sampling_rate[0],
                 band_low=res_low,
                 band_high=res_high,
             )
