@@ -15,7 +15,7 @@ DetectorAcquire    = 1
 FilePluginIdle     = 0
 WritePluginCapture = 1
 
-StartCommand       = 'Acquire!'
+StartCommand       = 'Acquire'
 
 
 """
@@ -332,10 +332,10 @@ def main():
                 is_start = val_str.lower().startswith(StartCommand.lower())
                 # Detect rising edge: was not start, now is start
                 if is_start and not last_is_start:
-                    info('APSStart changed to "start": arming write plugin')
+                    info('APSStart changed to "Acquire": arming write plugin')
                     arm_write_plugin(pv, args.number_of_images, fps)
                     time.sleep(1)
-                    info('APSStart changed to "start": starting acquisition')
+                    info('APSStart changed to "Acquire": starting acquisition')
                     pv['Cam1Acquire'].put(DetectorAcquire)
                     wait_pv(pv['Cam1Acquire'], DetectorAcquire, 2)
                     info('Acquisition complete; returning to monitoring')
