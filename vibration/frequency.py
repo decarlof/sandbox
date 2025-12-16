@@ -410,8 +410,8 @@ def main():
         )
 
         print("=============== Dual-band (position-based) =================")
-        print(f"Vent line      [{vent_low:.1f}, {vent_high:.1f}] Hz : {vent_freq:.3f} Hz")
-        print(f"Resonance mode [{res_low:.1f}, {res_high:.1f}] Hz : {res_freq:.3f} Hz")
+        print(f"Peak in the range     [{vent_low:.1f}, {vent_high:.1f}] Hz : {vent_freq:.3f} Hz")
+        print(f"Peak in the range  [{res_low:.1f}, {res_high:.1f}] Hz : {res_freq:.3f} Hz")
         print("===========================================================\n")
 
     # Optional plots for the current band
