@@ -15,7 +15,7 @@ DetectorAcquire    = 1
 FilePluginIdle     = 0
 WritePluginCapture = 1
 
-StartCommand       = 'Acquire'
+StartCommand       = 'Acquire!'
 
 
 """
@@ -252,11 +252,11 @@ def measure_fps(global_PVs):
 
 def parse_args():
 
-    default_aps_start_pv    = "2bmb:TomoScan:UserBadge"
+    # default_aps_start_pv    = "2bmb:TomoScan:UserBadge"
     # default_aps_start_pv    = "S-INJ:InjectionPeriodCounterM"
-    # default_aps_start_pv    = "OPS:message6"
-    default_aps_filename_pv = "2bmb:TomoScan:ESAFNumber"
-    # default_aps_filename_pv = "OPS:message17"
+    default_aps_start_pv    = "OPS:message8"
+    # default_aps_filename_pv = "2bmb:TomoScan:ESAFNumber"
+    default_aps_filename_pv = "OPS:message7"
     default_detector_prefix = "2bmSP1:"
     default_file_format     = "hdf"
     default_num_images      = 10
