@@ -342,7 +342,7 @@ def main():
                 positions_r,
                 freqs_r,
                 fft_r,
-                sampling_rate=,
+                sampling_rate=args.fps,
                 band_low=res_low,
                 band_high=res_high,
             )
