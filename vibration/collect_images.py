@@ -15,6 +15,9 @@ DetectorAcquire    = 1
 FilePluginIdle     = 0
 WritePluginCapture = 1
 
+CloseShutterValue  = 1
+OpenShutterValue   = 1
+
 StartCommand       = 'Acquire'
 
 
@@ -116,16 +119,21 @@ def wait_pv(pv, wait_val, max_timeout_sec=-1):
             return True
 
 
-def init_general_PVs(aps_start_pv, aps_file_name_pv, detector_prefix, file_format):
+def init_general_PVs(args):
 
     global_PVs = {}
 
     # aps PV
-    global_PVs['APSStart']    = PV(aps_start_pv)
-    global_PVs['APSFileName'] = PV(aps_file_name_pv)
+    global_PVs['APSStart']     = PV(args.aps_start_pv)
+    global_PVs['APSFileName']  = PV(args.aps_filename_pv)
+    global_PVs['HDF5Location'] = PV(args.hdf5_location_pv)
+
+    # shutter PV
+    global_PVs['OpenShutter']  = PV(args.open_shutter_pv) 
+    global_PVs['CloseShutter'] = PV(args.close_shutter_pv) 
 
     # detector pv's
-    camera_prefix = detector_prefix + 'cam1:'
+    camera_prefix = args.detector_prefix + 'cam1:'
 
     global_PVs['CamManufacturer_RBV'] = PV(camera_prefix + 'Manufacturer_RBV')
     global_PVs['CamModel']            = PV(camera_prefix + 'Model_RBV')
@@ -149,7 +157,7 @@ def init_general_PVs(aps_start_pv, aps_file_name_pv, detector_prefix, file_forma
     global_PVs['Cam1PixelFormat_RBV'] = PV(camera_prefix + 'PixelFormat_RBV')
     global_PVs['Cam1ArrayRate_RBV']   = PV(camera_prefix + 'ArrayRate_RBV')
 
-    image_prefix = detector_prefix + 'image1:'
+    image_prefix = args.detector_prefix + 'image1:'
     global_PVs['Image']       = PV(image_prefix + 'ArrayData')
     global_PVs['Cam1Display'] = PV(image_prefix + 'EnableCallbacks')
 
@@ -168,10 +176,10 @@ def init_general_PVs(aps_start_pv, aps_file_name_pv, detector_prefix, file_forma
         error('Detector %s (model %s) is not supported' % (manufacturer, model))
         return None
 
-    if file_format == "hdf":
-        plugin_prefix = detector_prefix + 'HDF1:'
+    if args.file_format == "hdf":
+        plugin_prefix = args.detector_prefix + 'HDF1:'
     else:
-        plugin_prefix = detector_prefix + 'TIFF1:'
+        plugin_prefix = args.detector_prefix + 'TIFF1:'
 
     global_PVs['FPFullFileNameRBV'] = PV(plugin_prefix + 'FullFileName_RBV')
     global_PVs['FileName']          = PV(plugin_prefix + 'FileName')
@@ -222,6 +230,7 @@ def init_detector(global_PVs, n_images):
 
 def arm_write_plugin(global_PVs, n_images, fps):
 
+    global_PVs['HDF5Location'].put('/exchange/data', wait=True)
     raw_str = global_PVs['APSFileName'].get()
     base_filename = sanitize_filename(raw_str)
     now_str = datetime.now().isoformat(timespec="seconds").replace(":", "-")
@@ -250,22 +259,63 @@ def measure_fps(global_PVs):
     warning('  Frame rate: %d' % fps)
     return int(fps)
 
+def open_shutter(global_PVs):
+    """Opens the shutter to collect flat fields or projections.
+
+    The value in the ``OpenShutterValue`` PV is written to the ``OpenShutter`` PV.
+    """
+
+    if not global_PVs['OpenShutter'] is None:
+        pv = global_PVs['OpenShutter']
+        value = OpenShutterValue
+        log.info('open shutter: %s, value: %s', pv, value)
+        global_PVs['OpenShutter'].put(value, wait=True)
+
+def close_shutter(global_PVs):
+    """Closes the shutter to collect dark fields.
+
+    The value in the ``CloseShutterValue`` PV is written to the ``CloseShutter`` PV.
+    """
+    if not global_PVs['CloseShutter'] is None:
+        pv = global_PVs['CloseShutter']
+        value = CloseShutterValue
+        log.info('close shutter: %s, value: %s', pv, value)
+        global_PVs['CloseShutter'].put(value, wait=True)
+
 def parse_args():
 
-    default_aps_start_pv    = "OPS:message8"
-    default_aps_filename_pv = "OPS:message7"
-    default_detector_prefix = "2bmSP1:"
-    default_file_format     = "hdf"
-    default_num_images      = 1000
+    default_aps_start_pv     = "OPS:message8"
+    default_aps_filename_pv  = "OPS:message7"
+    default_detector_prefix  = "2bmSP1:"
+    default_file_format      = "hdf"
+    default_hdf5_location_pv = "2bmb:TomoScan:HDF5Location"   #   /exchange/data
+    default_num_images       = 1000
+    default_open_shutter     = "2bma:A_shutter:open.VAL"
+    default_close_shutter    = "2bma:A_shutter:close.VAL"
 
     parser = argparse.ArgumentParser(
         description="Configure 2bmSP1 detector, write plugin, and start on APS start PV."
     )
 
     parser.add_argument(
+        "--open-shutter-pv",
+        default=default_open_shutter,
+        help=f"PV to open the shutter (default: {default_open_shutter})",
+    )
+    parser.add_argument(
+        "--close-shutter-pv",
+        default=default_close_shutter,
+        help=f"PV to close the shutter (default: {default_close_shutter})",
+    )
+    parser.add_argument(
         "--aps-start-pv",
         default=default_aps_start_pv,
         help=f"PV to monitor for start command (default: {default_aps_start_pv})",
+    )
+    parser.add_argument(
+        "--hdf5-location-pv",
+        default=default_hdf5_location_pv,
+        help=f"PV to define the data location in the hdf5 file (default: {default_hdf5_location_pv})",
     )
     parser.add_argument(
         "--aps-filename-pv",
@@ -295,6 +345,7 @@ def parse_args():
 
 def main():
     args = parse_args()
+    print(args)
 
     # This is just to print nice logger messages
     setup_custom_logger()
@@ -303,14 +354,11 @@ def main():
     info(f"  APS start PV     : {args.aps_start_pv}")
     info(f"  APS filename PV  : {args.aps_filename_pv}")
     info(f"  Detector prefix  : {args.detector_prefix}")
+    info(f"  HDF5 location PV : {args.hdf5_location_pv}")
     info(f"  Number of images : {args.number_of_images}")
 
-    pv = init_general_PVs(
-        args.aps_start_pv,
-        args.aps_filename_pv,
-        args.detector_prefix,
-        args.file_format
-    )
+    pv = init_general_PVs(args)
+
     if pv is None:
         sys.exit(1)
 
