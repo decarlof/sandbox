@@ -251,6 +251,12 @@ def main():
         action="store_true",
         help="Read summary rows from CSV and plot without recomputing frequencies.",
     )
+    parser.add_argument(
+        "--hdf5_location",
+        default="/exchange/data",
+        help=f"Data location in the hdf5 file (default: /exchange/data).",
+    )
+
     args = parser.parse_args()
 
     folder = args.folder
@@ -280,7 +286,7 @@ def main():
         ext = os.path.splitext(path)[1].lower()
         if ext in [".h5", ".hdf5"]:
             with h5py.File(path, "r") as f:
-                data = f["/exchange/data"][:]
+                data = f[args.hdf5_location][:]
                 mp = meta.read_meta.Hdf5MetadataReader(path)
                 meta_dict = mp.readMetadata()
                 mp.close()
