@@ -256,7 +256,12 @@ def main():
         default="/exchange/data",
         help=f"Data location in the hdf5 file (default: /exchange/data).",
     )
-
+    parser.add_argument(
+        "--fps",
+        type=float,
+        default=100.0,
+        help="Acquisition rate in frames per second (default: 100).",
+    )
     args = parser.parse_args()
 
     folder = args.folder
@@ -290,7 +295,6 @@ def main():
                 mp = meta.read_meta.Hdf5MetadataReader(path)
                 meta_dict = mp.readMetadata()
                 mp.close()
-                sampling_rate = meta_dict['/measurement/instrument/detector/frame_rate']
 
         else:
             # For completeness; your current data are .h5
@@ -304,7 +308,7 @@ def main():
         # Vent band [25, 35] Hz
         vent_freq, positions_v, freqs_v, fft_v = extract_vibration_frequency_position(
             data,
-            sampling_rate=sampling_rate[0],
+            sampling_rate=args.fps,
             upsample=args.upsample,
             max_frames=args.max_frames,
             band_low=vent_low,
@@ -314,7 +318,7 @@ def main():
         # Resonance band [35, 100] Hz
         res_freq, positions_r, freqs_r, fft_r = extract_vibration_frequency_position(
             data,
-            sampling_rate=sampling_rate[0],
+            sampling_rate=args.fps,
             upsample=args.upsample,
             max_frames=args.max_frames,
             band_low=res_low,
@@ -338,7 +342,7 @@ def main():
                 positions_r,
                 freqs_r,
                 fft_r,
-                sampling_rate=sampling_rate[0],
+                sampling_rate=,
                 band_low=res_low,
                 band_high=res_high,
             )
