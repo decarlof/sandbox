@@ -349,7 +349,7 @@ def main():
 
         # Add to summary
         # summary_rows.append((fname, vent_freq, res_freq))
-        summary_rows.append((fname, meta_dict['/measurement/instrument/detector/frame_rate'][0], meta_dict['/process/acquisition/start_date'][0], vent_freq, res_freq))
+        summary_rows.append((fname, args.fps, meta_dict['/process/acquisition/start_date'][0], vent_freq, res_freq))
 
     # # Print summary table at the end
     # print("\n====================== Summary table ======================")
