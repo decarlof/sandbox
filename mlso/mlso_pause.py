@@ -144,7 +144,7 @@ def main():
     plot_distribution(
         durations,
         days_without_pauses=days_without_pauses,
-        bin_minutes=10,
+        bin_minutes=1,
         x_tick_minutes=args.xtick_min,
     )
 
