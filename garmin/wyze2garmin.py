@@ -113,8 +113,8 @@ def export_scale_to_garmin_csv(csv_file, garmin_csv_file):
 
 def main():
 
-    full_csv_file = "bilancia_all.csv"
-    garmin_csv_file = "bilancia_garmin.csv"
+    full_csv_file = "bilancia2view.csv"
+    garmin_csv_file = "bilancia2garmin.csv"
 
     access_token = login_to_wyze()
     if not access_token:
