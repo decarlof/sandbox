@@ -5,6 +5,7 @@ from wyze_sdk import Client
 from wyze_sdk.errors import WyzeApiError
 from dotenv import load_dotenv
 from datetime import datetime
+from requests.exceptions import HTTPError
 
 # Load .env
 load_dotenv()
@@ -20,12 +21,35 @@ def login_to_wyze():
             email=WYZE_EMAIL,
             password=WYZE_PASSWORD,
             key_id=WYZE_KEY_ID,
-            api_key=WYZE_API_KEY
+            api_key=WYZE_API_KEY,
         )
-        return response.get('access_token')
+        return response.get("access_token")
+
+    except HTTPError as e:
+        # Wyze returns HTTP 400 when 2FA is enabled but no TOTP is provided
+        if e.response is not None and e.response.status_code == 400:
+            print(
+                "\n❌ Wyze login failed (HTTP 400).\n"
+                "This often happens when Two-Factor Authentication (2FA) is enabled.\n\n"
+                "➡️ Please check the Wyze mobile app:\n"
+                "   Account → Security → Two-Factor Authentication\n\n"
+                "If 2FA is enabled, either:\n"
+                "  • disable it, or\n"
+                "  • update this script to provide a TOTP secret to Client(totp_key=...).\n"
+            )
+        else:
+            print(f"HTTP error during Wyze login: {e}")
+
+        return None
+
     except WyzeApiError as e:
         print(f"Wyze API Error: {e}")
         return None
+
+    except Exception as e:
+        print(f"Unexpected error during Wyze login: {e}")
+        return None
+
 
 def export_scale_to_csv(client, scale, csv_file="wyze_scale_data.csv"):
     """Export all records of the scale to CSV"""
