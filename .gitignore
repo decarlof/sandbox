@@ -175,3 +175,6 @@ auto_positions.sav*
 #tomoScan products
 .loglogin
 .config
+
+#env
+.env
