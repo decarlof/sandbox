@@ -12,9 +12,9 @@ import signal
 import sys
 
 # --- Configuration ---
-ACQUIRE_PV = "2bmSP1:cam1:Acquire"
-IMAGE_MODE_PV = "2bmSP1:cam1:ImageMode"
-NUM_IMAGES_PV = "2bmSP1:cam1:NumImages"
+ACQUIRE_PV = "2bmSP2:cam1:Acquire"
+IMAGE_MODE_PV = "2bmSP2:cam1:ImageMode"
+NUM_IMAGES_PV = "2bmSP2:cam1:NumImages"
 CURRENT_PV = "S-DCCT:CurrentM"
 CURRENT_THRESHOLD = 100.0  # mA
 ACQUISITION_INTERVAL = 60  # seconds

@@ -18,6 +18,7 @@ Output:
 
 import os
 import sys
+import re
 import glob
 import numpy as np
 from skimage import io
@@ -28,6 +29,15 @@ IMAGES_PER_SET = 10
 ACQUISITION_INTERVAL = 60  # seconds between sets
 EXPOSURE_TIME = 0.1        # seconds per frame
 FILE_PREFIX = "flat_2x_2bin3.45um_momo20keV_"
+
+
+def extract_file_number(filepath):
+    """Extract the numeric index from a flat field filename."""
+    basename = os.path.basename(filepath)
+    match = re.search(r'_(\d+)\.tiff?$', basename)
+    if match:
+        return int(match.group(1))
+    return -1
 
 
 def load_image(filepath):
@@ -97,14 +107,19 @@ def compute_vertical_shift(profile_ref, profile_target):
 def find_image_files(image_dir):
     """
     Find and sort all flat field TIFF files in the directory.
+    Sort NUMERICALLY by the file index to ensure chronological order.
     Returns sorted list of file paths.
     """
     pattern = os.path.join(image_dir, f"{FILE_PREFIX}*.tif")
-    files = sorted(glob.glob(pattern))
+    files = glob.glob(pattern)
     if not files:
         # Try .tiff extension
         pattern = os.path.join(image_dir, f"{FILE_PREFIX}*.tiff")
-        files = sorted(glob.glob(pattern))
+        files = glob.glob(pattern)
+
+    # Sort numerically by extracted index
+    files.sort(key=extract_file_number)
+
     return files
 
 
@@ -128,6 +143,24 @@ def main():
     if n_files == 0:
         print("ERROR: No files found. Check directory and file prefix.")
         sys.exit(1)
+
+    # Verify sorting
+    first_num = extract_file_number(files[0])
+    last_num = extract_file_number(files[-1])
+    print(f"File index range: {first_num} - {last_num}")
+    print(f"  First file: {os.path.basename(files[0])}")
+    print(f"  Last file:  {os.path.basename(files[-1])}")
+
+    # Check for gaps
+    expected_numbers = set(range(first_num, first_num + n_files))
+    actual_numbers = set(extract_file_number(f) for f in files)
+    missing = expected_numbers - actual_numbers
+    if missing:
+        print(f"WARNING: {len(missing)} missing file indices detected!")
+        if len(missing) <= 20:
+            print(f"  Missing: {sorted(missing)}")
+    else:
+        print(f"  No gaps detected. Continuous sequence confirmed.")
 
     n_sets = n_files // IMAGES_PER_SET
     remainder = n_files % IMAGES_PER_SET
@@ -157,6 +190,12 @@ def main():
         start_idx = s * IMAGES_PER_SET
         set_files = files[start_idx: start_idx + IMAGES_PER_SET]
 
+        # Verify set file indices are consecutive
+        set_numbers = [extract_file_number(f) for f in set_files]
+        expected_set = list(range(set_numbers[0], set_numbers[0] + IMAGES_PER_SET))
+        if set_numbers != expected_set:
+            print(f"  WARNING: Set {s} has non-consecutive indices: {set_numbers}")
+
         # Load all images in this set and compute vertical profiles
         profiles = []
         for f in set_files:
@@ -184,8 +223,9 @@ def main():
 
         if (s + 1) % 50 == 0 or s == 0 or s == n_sets - 1:
             print(f"  Set {s:4d}/{n_sets}: "
-                  f"files {os.path.basename(set_files[0])} - "
-                  f"{os.path.basename(set_files[-1])} | "
+                  f"idx {set_numbers[0]:04d}-{set_numbers[-1]:04d} "
+                  f"({os.path.basename(set_files[0])} - "
+                  f"{os.path.basename(set_files[-1])}) | "
                   f"fast range: {shifts_from_first.max() - shifts_from_first.min():.3f} px")
 
     set_avg_profiles = np.array(set_avg_profiles)  # shape: (n_sets, height)
@@ -228,6 +268,19 @@ def main():
     print(f"  Detrended std:          {np.std(slow_detrended):.3f} pixels")
     print()
 
+    # Report outlier sets (slow shifts > 3 sigma)
+    slow_threshold = 3 * np.std(slow_detrended)
+    outlier_mask = np.abs(slow_detrended) > slow_threshold
+    n_outliers = np.sum(outlier_mask)
+    print(f"  Slow motion outliers (|detrended| > {slow_threshold:.2f} px): {n_outliers}")
+    if n_outliers > 0 and n_outliers <= 20:
+        outlier_indices = np.where(outlier_mask)[0]
+        for idx in outlier_indices:
+            print(f"    Set {idx:4d} (t={time_hours[idx]:.2f} h): "
+                  f"shift={slow_shifts[idx]:.3f} px, "
+                  f"detrended={slow_detrended[idx]:.3f} px")
+    print()
+
     # =============================================
     # STEP 3: Fast motion analysis
     # =============================================
@@ -243,6 +296,15 @@ def main():
     print(f"    Min:   {np.min(all_frame_shifts):.4f} pixels")
     print(f"    Max:   {np.max(all_frame_shifts):.4f} pixels")
     print(f"    |Max|: {np.max(np.abs(all_frame_shifts)):.4f} pixels")
+    print()
+
+    # Percentiles
+    pcts = [50, 90, 95, 99]
+    abs_shifts = np.abs(all_frame_shifts)
+    print(f"  Frame-to-frame |shift| percentiles:")
+    for p in pcts:
+        print(f"    {p:3d}th percentile: {np.percentile(abs_shifts, p):.4f} pixels")
+    print()
 
     # Range within each set (max - min of shifts from first frame)
     fast_ranges = np.ptp(fast_shifts_from_first, axis=1)
@@ -251,6 +313,21 @@ def main():
     print(f"    Std range:  {np.std(fast_ranges):.4f} pixels")
     print(f"    Min range:  {np.min(fast_ranges):.4f} pixels")
     print(f"    Max range:  {np.max(fast_ranges):.4f} pixels")
+    print()
+
+    # Report sets with large fast motion
+    fast_threshold = np.mean(fast_ranges) + 2 * np.std(fast_ranges)
+    large_fast = np.where(fast_ranges > fast_threshold)[0]
+    print(f"  Sets with large fast motion (range > {fast_threshold:.2f} px): "
+          f"{len(large_fast)}")
+    if len(large_fast) > 0 and len(large_fast) <= 30:
+        for idx in large_fast:
+            set_start = idx * IMAGES_PER_SET
+            set_nums = [extract_file_number(files[set_start + i])
+                        for i in range(IMAGES_PER_SET)]
+            print(f"    Set {idx:4d} (t={time_hours[idx]:.2f} h): "
+                  f"range={fast_ranges[idx]:.3f} px, "
+                  f"files idx {set_nums[0]:04d}-{set_nums[-1]:04d}")
     print()
 
     # =============================================
@@ -269,10 +346,13 @@ def main():
     print(f"    Total drift range:   {slow_shifts.max() - slow_shifts.min():.3f} pixels")
     print(f"    Linear trend:        {trend_slope * 60:.4f} pixels/hour")
     print(f"    Detrended std:       {np.std(slow_detrended):.3f} pixels")
+    print(f"    Outlier sets:        {n_outliers}")
     print()
     print(f"  FAST MOTION (within 1s sets, 0.1s interval):")
     print(f"    Frame-to-frame std:  {np.std(all_frame_shifts):.4f} pixels")
     print(f"    Mean within-set range: {np.mean(fast_ranges):.4f} pixels")
+    print(f"    90th pct |shift|:    {np.percentile(abs_shifts, 90):.4f} pixels")
+    print(f"    Large-motion sets:   {len(large_fast)}")
     print()
 
     # =============================================
@@ -293,7 +373,7 @@ def main():
     print(f"Numerical results saved to: {out_npz}")
 
     # =============================================
-    # STEP 6: Generate plots (optional, skip if matplotlib not available)
+    # STEP 6: Generate plots
     # =============================================
     try:
         import matplotlib
@@ -317,9 +397,12 @@ def main():
         axes[1].grid(True, alpha=0.3)
 
         axes[2].plot(time_hours, fast_ranges, 'orange', linewidth=0.5, alpha=0.7)
+        axes[2].axhline(fast_threshold, color='r', linestyle='--', alpha=0.5,
+                        label=f'Threshold: {fast_threshold:.1f} px')
         axes[2].set_ylabel('Within-set range (pixels)')
         axes[2].set_xlabel('Time (hours)')
         axes[2].set_title(f'Fast motion range per set (mean = {np.mean(fast_ranges):.4f} px)')
+        axes[2].legend()
         axes[2].grid(True, alpha=0.3)
 
         plt.tight_layout()
@@ -344,8 +427,10 @@ def main():
         n_example = min(5, n_sets)
         frame_times = np.arange(IMAGES_PER_SET) * EXPOSURE_TIME
         for s in range(n_example):
+            set_start = s * IMAGES_PER_SET
+            start_num = extract_file_number(files[set_start])
             axes[1].plot(frame_times, fast_shifts_from_first[s],
-                         'o-', markersize=3, label=f'Set {s}')
+                         'o-', markersize=3, label=f'Set {s} (idx {start_num})')
         axes[1].set_xlabel('Time within set (s)')
         axes[1].set_ylabel('Shift from first frame (pixels)')
         axes[1].set_title('Example fast motion traces (first 5 sets)')
@@ -366,4 +451,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
