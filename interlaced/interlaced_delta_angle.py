@@ -469,11 +469,27 @@ def plot_delta_angle_distributions(
 def plot_distinct_deltas_vs_N_K(
     N_values=None,
     K_values=None,
+    jitter=0,
 ):
+    """
+    Empirically measure the number of distinct delta_theta values
+    as a function of N and K for all four schemes.
+
+    Parameters
+    ----------
+    N_values : list of int or None
+        Angles-per-turn values to test.
+    K_values : list of int or None
+        Number-of-turns values to test.
+    jitter : float
+        Vertical jitter to separate overlapping lines.
+        0.0 = no jitter (lines overlap when equal),
+        1.0 = default separation (±0.15).
+    """
     if N_values is None:
         N_values = [10, 20, 50, 100, 200, 500, 1000]
     if K_values is None:
-        K_values = [1, 2, 3, 4, 5, 6, 8, 10, 16]
+        K_values = [1, 2, 4, 8, 16]
 
     schemes = {
         "Equally Spaced": lambda N, K: compute_equally_spaced_multiturn_angles(
@@ -490,7 +506,7 @@ def plot_distinct_deltas_vs_N_K(
         ),
     }
 
-    markers = ["o", "s", "D", "^", "v", "P", "*", "X", "h"]
+    markers = ["o", "s", "D", "^", "v", "P", "*", "X"]
     fig, axes = plt.subplots(1, len(schemes), figsize=(5 * len(schemes), 5))
     fig.suptitle(
         "Number of distinct $\\Delta\\theta$ values vs. N (angles per turn)\n"
@@ -501,7 +517,8 @@ def plot_distinct_deltas_vs_N_K(
     colors_K = plt.cm.viridis(np.linspace(0.2, 0.9, len(K_values)))
 
     n_K = len(K_values)
-    jitter_offsets = np.linspace(-0.15, 0.15, n_K)
+    max_jitter = 0.15 * jitter
+    jitter_offsets = np.linspace(-max_jitter, max_jitter, n_K)
 
     for ax, (scheme_name, scheme_fn) in zip(axes, schemes.items()):
         ax.set_title(scheme_name, fontsize=11, fontweight="bold")
@@ -521,14 +538,11 @@ def plot_distinct_deltas_vs_N_K(
 
             if valid_N:
                 jittered = [v + jitter_offsets[ki] for v in n_distinct_list]
-                is_pow2 = K >= 1 and (K & (K - 1)) == 0
-                label = f"K={K}" if is_pow2 else f"K={K} (non-2ⁿ)"
                 ax.plot(
                     valid_N, jittered,
-                    linestyle="-" if is_pow2 else "--",
-                    color=colors_K[ki], lw=1.5,
+                    linestyle="-", color=colors_K[ki], lw=1.5,
                     marker=markers[ki % len(markers)], ms=7,
-                    label=label,
+                    label=f"K={K}",
                     alpha=0.85,
                 )
 
@@ -536,15 +550,15 @@ def plot_distinct_deltas_vs_N_K(
         ax.set_ylabel("# distinct $\\Delta\\theta$ values")
         ax.set_xscale("log")
         ax.yaxis.set_major_locator(plt.MaxNLocator(integer=True))
-        ax.legend(fontsize=7)
+        ax.legend(fontsize=8)
         ax.grid(True, alpha=0.3)
 
     plt.tight_layout()
     plt.show()
 
     # Print table
-    print(f"\n{'Scheme':>20s} {'K':>4s} {'N':>6s} {'#distinct':>10s} {'note':>12s}")
-    print("-" * 58)
+    print(f"\n{'Scheme':>20s} {'K':>4s} {'N':>6s} {'#distinct':>10s}")
+    print("-" * 45)
     for scheme_name, scheme_fn in schemes.items():
         for K in K_values:
             for N in N_values:
@@ -552,15 +566,13 @@ def plot_distinct_deltas_vs_N_K(
                     angles_per_turn, _, _ = scheme_fn(N, K)
                     delta = compute_delta_angles_acquisition_order(angles_per_turn)
                     n_dist = count_distinct_deltas(delta)
-                    is_pow2 = K >= 1 and (K & (K - 1)) == 0
-                    note = "" if is_pow2 else "non-2^n"
-                    print(f"{scheme_name:>20s} {K:4d} {N:6d} {n_dist:10d} {note:>12s}")
+                    print(f"{scheme_name:>20s} {K:4d} {N:6d} {n_dist:10d}")
                 except (ValueError, AssertionError):
                     pass
 
 def main():
-    num_angles = 100
-    K_interlace = 1
+    num_angles = 500
+    K_interlace = 16
     rotation_start = 0.0
     rotation_stop = 360.0
     degrees = True
