@@ -26,20 +26,23 @@ def compute_equally_spaced_multiturn_angles(
     N = int(num_angles)
     K = int(K_interlace)
 
+
     if delta_theta is None:
-        delta_theta = (rotation_stop - rotation_start) / (N - 1)
+        delta_theta = (rotation_stop - rotation_start) / N
     rotation_step = float(delta_theta)
 
     n = np.arange(N, dtype=float)
     angles_per_turn = []
     for k in range(K):
-        theta_n = rotation_start + (n + k / K) * rotation_step
+        theta_n = rotation_start + (n + k / K) * rotation_step + 360.0 * k
         angles_per_turn.append(theta_n)
 
     theta_interlaced = np.concatenate(angles_per_turn).astype(float)
     theta_monotonic = np.sort(theta_interlaced)
 
     return angles_per_turn, theta_interlaced, theta_monotonic
+
+
 
 
 def compute_golden_angle_multiturn_angles(
@@ -104,10 +107,11 @@ def compute_corput_multiturn_angles(
     if delta_theta is not None:
         delta_theta = float(delta_theta)
     else:
-        delta_theta = (float(rotation_stop) - start) / (N - 1)
+        delta_theta = (float(rotation_stop) - start) / N
 
     base = start + np.arange(N, dtype=np.float64) * delta_theta
 
+    # Bit-reversed rotation offsets (length K)
     bitsK = int(np.ceil(np.log2(K))) if K > 1 else 1
     MK = 1 << bitsK
     p_corput = np.array(
@@ -117,6 +121,7 @@ def compute_corput_multiturn_angles(
     assert len(p_corput) == K
     offsets = (p_corput.astype(np.float64) / float(K)) * delta_theta
 
+    # Bit-reversed intra-rotation index order (length N)
     bitsN = int(np.ceil(np.log2(N))) if N > 1 else 1
     MN = 1 << bitsN
     indices = np.array(
@@ -129,8 +134,16 @@ def compute_corput_multiturn_angles(
     for k in range(K):
         offset = offsets[k]
         loop_angles = base[indices] + offset
+
+        # Wrap into [rotation_start, rotation_start + 360)
         loop_angles_mod = np.mod(loop_angles - start, 360.0) + start
+
+        # Sort within this turn (sample rotates forward continuously)
+        loop_angles_mod = np.sort(loop_angles_mod)
+
+        # Unwrap: shift each rotation block by +360*k
         loop_angles_unwrapped = loop_angles_mod + 360.0 * k
+
         angles_per_turn.append(loop_angles_unwrapped)
 
     theta_unsorted = np.concatenate(angles_per_turn).astype(np.float64)
