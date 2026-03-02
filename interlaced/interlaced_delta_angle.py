@@ -1,3 +1,4 @@
+import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -13,6 +14,10 @@ def _bit_reverse(val: int, bits: int) -> int:
 def _ensure_power_of_two(K: int):
     if K < 1 or (K & (K - 1)) != 0:
         raise ValueError(f"K={K} must be a power of two.")
+
+
+def _is_power_of_two(K: int) -> bool:
+    return K >= 1 and (K & (K - 1)) == 0
 
 
 def compute_equally_spaced_multiturn_angles(
@@ -256,6 +261,14 @@ def polar_plot_interlaced_grid(
 
     for idx, ds in enumerate(datasets):
         ax = fig.add_subplot(nrows, ncols, idx + 1, projection="polar")
+        if ds.get("unavailable"):
+            ax.set_title(ds.get("title", ""), pad=20, fontsize=11)
+            ax.text(0.5, 0.5, ds.get("message", "Not available"),
+                    transform=ax.transAxes, ha="center", va="center",
+                    fontsize=10, color="gray", style="italic")
+            ax.set_rticks([])
+            ax.grid(False)
+            continue
         polar_plot_interlaced(
             ds["angles_per_turn"],
             ds["theta_interlaced"],
@@ -306,17 +319,34 @@ def plot_delta_angle_distributions(
 
     all_deltas = []
     for ds in datasets:
-        delta = compute_delta_angles_acquisition_order(ds["angles_per_turn"])
-        all_deltas.append(delta)
+        if ds.get("unavailable"):
+            all_deltas.append(None)
+        else:
+            delta = compute_delta_angles_acquisition_order(ds["angles_per_turn"])
+            all_deltas.append(delta)
 
-    global_min = min(d.min() for d in all_deltas)
-    global_max = max(d.max() for d in all_deltas)
+    valid_deltas = [d for d in all_deltas if d is not None]
+    global_min = min(d.min() for d in valid_deltas)
+    global_max = max(d.max() for d in valid_deltas)
     margin = (global_max - global_min) * 0.1
     if margin < 1e-10:
         margin = 0.1
     shared_xlim = (global_min - margin, global_max + margin)
+    ax_hist_axes = []
 
     for col, (ds, delta) in enumerate(zip(datasets, all_deltas)):
+        if ds.get("unavailable"):
+            msg = ds.get("message", "Not available")
+            for row in range(3):
+                ax = axes[row, col]
+                ax.text(0.5, 0.5, msg, transform=ax.transAxes,
+                        ha="center", va="center", fontsize=10,
+                        color="gray", style="italic")
+                ax.set_title(ds.get("title", ""), fontsize=11, fontweight="bold")
+                ax.set_xticks([])
+                ax.set_yticks([])
+            continue
+
         angles_per_turn = ds["angles_per_turn"]
         K = len(angles_per_turn)
         N = len(angles_per_turn[0])
@@ -345,9 +375,13 @@ def plot_delta_angle_distributions(
             stemlines.set_color(colors[col % len(colors)])
             stemlines.set_linewidth(2)
 
+            total_frames = N * K
+            delta_rounded = np.round(delta, decimals=6)
             for v, c in zip(vals, cnts):
+                collected = 1 + int(np.sum(delta_rounded >= v))
+                eff = 100.0 * collected / total_frames
                 ax_hist.annotate(
-                    f"{v:.3f}{unit}\n(n={c})",
+                    f"{v:.3f}{unit}\n(n={c})\n{eff:.1f}%",
                     xy=(v, c), xytext=(0, 8),
                     textcoords="offset points",
                     ha="center", fontsize=6,
@@ -369,10 +403,6 @@ def plot_delta_angle_distributions(
             ax_hist.set_ylim(0, y_top * 1.15)
 
         ax_hist.axvline(
-            np.mean(delta), color="r", ls="--", lw=1.5,
-            label=f"mean = {np.mean(delta):.3f}{unit}",
-        )
-        ax_hist.axvline(
             np.min(delta), color="green", ls=":", lw=1.5,
             label=f"min = {np.min(delta):.3f}{unit}",
         )
@@ -389,8 +419,14 @@ def plot_delta_angle_distributions(
         ax_hist.set_xlabel(rf"$\Delta\theta$ ({unit})")
         ax_hist.set_ylabel("Count")
         ax_hist.set_xlim(shared_xlim)
-        ax_hist.legend(fontsize=7)
+        ax_hist.legend(fontsize=7, loc="upper right")
+        ax_hist.text(0.02, 0.97, f"N={N}, K={K}",
+                     transform=ax_hist.transAxes, va="top", ha="left",
+                     fontsize=8,
+                     bbox=dict(boxstyle="round,pad=0.3", facecolor="white",
+                               alpha=0.7, edgecolor="none"))
         ax_hist.grid(True, alpha=0.3)
+        ax_hist_axes.append(ax_hist)
 
         # --- Middle row: delta vs acquisition index ---
         ax_stem = axes[1, col]
@@ -461,6 +497,11 @@ def plot_delta_angle_distributions(
             f"unique={n_unique:4d}  "
             f"[{fly_status}]"
         )
+
+    if ax_hist_axes:
+        shared_ylim = max(ax.get_ylim()[1] for ax in ax_hist_axes)
+        for ax in ax_hist_axes:
+            ax.set_ylim(0, shared_ylim)
 
     plt.tight_layout()
     plt.show()
@@ -570,11 +611,278 @@ def plot_distinct_deltas_vs_N_K(
                 except (ValueError, AssertionError):
                     pass
 
-def main():
-    num_angles = 500
-    K_interlace = 16
+def compute_frame_time(
+    exposure_time,
+    camera_model="Grasshopper3 GS3-U3-23S6M",
+    pixel_format="Mono8",
+    video_mode="Mode0",
+):
+    """Compute the minimum time between camera triggers (frame time).
+
+    Returns the frame time in seconds, which is the larger of:
+    - ``exposure_time`` plus a camera-specific readout margin, or
+    - the camera readout time plus 1 ms.
+
+    Readout times are empirical values measured at 100 µs exposure with
+    1000 frames without dropping.  The ``video_mode`` parameter is only
+    relevant for the Grasshopper3 GS3-U3-23S6M camera.
+
+    Parameters
+    ----------
+    exposure_time : float
+        Requested camera exposure time in seconds.
+    camera_model : str
+        Camera model string as reported by the detector driver.
+    pixel_format : str
+        Pixel format string (e.g. ``'Mono8'``, ``'Mono16'``).
+    video_mode : str
+        Video mode string; only used for the GS3-U3-23S6M model.
+
+    Returns
+    -------
+    float
+        Frame time in seconds, or 0 if the camera/format combination is
+        not recognised.
+    """
+    readout = None
+    readout_margin = 1.01
+
+    if camera_model == "Grasshopper3 GS3-U3-23S6M":
+        readout_times = {
+            "Mono8":        {"Mode0": 6.2,  "Mode1": 6.2, "Mode5": 6.2, "Mode7": 7.9},
+            "Mono12Packed": {"Mode0": 9.2,  "Mode1": 6.2, "Mode5": 6.2, "Mode7": 11.5},
+            "Mono16":       {"Mode0": 12.2, "Mode1": 6.2, "Mode5": 6.2, "Mode7": 12.2},
+        }
+        readout = readout_times[pixel_format][video_mode] / 1000.0
+
+    elif camera_model == "Grasshopper3 GS3-U3-51S5M":
+        readout_times = {
+            "Mono8": 6.18, "Mono12Packed": 8.20, "Mono12p": 8.20, "Mono16": 12.34,
+        }
+        readout = readout_times[pixel_format] / 1000.0
+
+    elif camera_model == "Oryx ORX-10G-51S5M":
+        readout_margin = 1.05
+        readout_times = {"Mono8": 6.18, "Mono12Packed": 8.20, "Mono16": 12.34}
+        readout = readout_times[pixel_format] / 1000.0
+
+    elif camera_model == "Oryx ORX-10G-310S9M":
+        readout_margin = 1.20
+        readout_times = {"Mono8": 30.0, "Mono12Packed": 30.0, "Mono16": 30.0}
+        readout = readout_times[pixel_format] / 1000.0
+
+    elif camera_model == "Q-12A180-Fm/CXP-6":
+        readout_times = {"Mono8": 5.35}
+        readout = readout_times[pixel_format] / 1000.0
+
+    elif camera_model == "Blackfly S BFS-PGE-161S7M":
+        readout_margin = 1.035
+        readout_times = {"Mono8": 83.4, "Mono12Packed": 100.0, "Mono16": 142.86}
+        readout = readout_times[pixel_format] / 1000.0
+
+    if readout is None:
+        print(
+            f"[compute_frame_time] Unsupported camera/format/mode: "
+            f"{camera_model!r} / {pixel_format!r} / {video_mode!r}"
+        )
+        return 0
+
+    frame_time = exposure_time * readout_margin
+    if frame_time < readout:
+        frame_time = readout + 0.001
+    return frame_time
+
+
+def pv_callback_efficiency(
+    InterlacedRotationStart=0.0,
+    InterlacedNumAngles=180,
+    InterlacedNumberOfRotation=4,
+    InterlacedMode=0,
+    exposure_time=0.001,
+    camera_model="Grasshopper3 GS3-U3-23S6M",
+    pixel_format="Mono8",
+    video_mode="Mode0",
+    rotation_stop=360.0,
+    frame_time_override=None,
+    InterlacedEfficiencyRequested=100,
+):
+    """Compute and report acquisition efficiency for the selected interlaced mode.
+
+    Mirrors the role of a PV callback: when any scan parameter changes this
+    function recomputes and prints:
+
+    * **InterlacedPSOWindowStep** = ``(rotation_stop - rotation_start) / N``
+      (identical to the real tomoScan formula; written to the MEDM display).
+
+    * **InterlacedScanTime** = total scan duration at the *slowest* stage
+      velocity (minimum Δθ), i.e. all frames are captured.
+
+    * An efficiency table with one row per distinct Δθ value of the chosen
+      mode.  Each row shows what happens when the rotation stage runs at
+      ``velocity = Δθ / frame_time``:
+
+        - **Collected** – frames whose preceding angular gap ≥ chosen Δθ
+          (camera has enough time to read out).  Frame 0 is always collected.
+        - **Dropped**   – frames whose preceding gap < chosen Δθ.
+        - **Efficiency** – collected / total_frames × 100 %.
+
+    Parameters
+    ----------
+    InterlacedRotationStart : float
+        Start angle in degrees.
+    InterlacedNumAngles : int
+        Projections per rotation (N).
+    InterlacedNumberOfRotation : int
+        Number of rotations / interlace factor (K).
+    InterlacedMode : int
+        0 = Uniform, 1 = TIMBIR, 2 = Golden Angle, 3 = Van der Corput.
+    exposure_time : float
+        Camera exposure time in seconds.
+    camera_model : str
+        Camera model string (see ``compute_frame_time``).
+    pixel_format : str
+        Camera pixel format string.
+    video_mode : str
+        Camera video mode string (GS3-U3-23S6M only).
+    rotation_stop : float
+        End angle in degrees.
+
+    InterlacedEfficiencyRequested : int
+        Desired acquisition efficiency (0–100 %).  The last row whose
+        efficiency meets or exceeds this value is marked with ``X`` in the
+        printed table and returned as ``selected_row``.
+
+    Returns
+    -------
+    dict or None
+        ``{"delta_theta", "velocity", "scan_time", "collected", "dropped", "efficiency"}``
+        for the selected row, or ``None`` if no row meets the requested efficiency
+        or the camera/mode is not supported.
+    """
+    N = int(InterlacedNumAngles)
+    K = int(InterlacedNumberOfRotation)
+    start = float(InterlacedRotationStart)
+    stop  = float(rotation_stop)
+    total_frames = N * K
+
+    mode_names = {0: "Uniform", 1: "TIMBIR", 2: "Golden Angle", 3: "Van der Corput"}
+
+    if frame_time_override is not None:
+        frame_time = float(frame_time_override)
+    else:
+        frame_time = compute_frame_time(exposure_time, camera_model, pixel_format, video_mode)
+    if frame_time == 0:
+        print("[pv_callback_efficiency] frame_time = 0: unsupported camera/format.")
+        return {}
+
+    # InterlacedPSOWindowStep — same formula as tomoScan (360 / N, or scaled range)
+    pso_step = (stop - start) / N
+
+    # --- compute angles for the selected mode ---
+    try:
+        if InterlacedMode == 0:
+            angles_per_turn, _, _ = compute_equally_spaced_multiturn_angles(
+                num_angles=N, K_interlace=K, rotation_start=start, rotation_stop=stop)
+        elif InterlacedMode == 1:
+            if not _is_power_of_two(K):
+                raise ValueError(f"TIMBIR requires K to be a power of 2 (got K={K})")
+            angles_per_turn, _, _ = compute_timbir_multiturn_angles(
+                num_angles=N, K_interlace=K, rotation_start=start)
+        elif InterlacedMode == 2:
+            angles_per_turn, _, _ = compute_golden_angle_multiturn_angles(
+                num_angles=N, K_interlace=K, rotation_start=start)
+        elif InterlacedMode == 3:
+            angles_per_turn, _, _ = compute_corput_multiturn_angles(
+                num_angles=N, K_interlace=K, rotation_start=start, rotation_stop=stop)
+        else:
+            raise ValueError(f"Unknown InterlacedMode={InterlacedMode}")
+    except (ValueError, AssertionError) as exc:
+        print(f"[pv_callback_efficiency] Mode {InterlacedMode} not available: {exc}")
+        return {}
+
+    delta         = compute_delta_angles_acquisition_order(angles_per_turn)
+    delta_rounded = np.round(delta, decimals=6)
+    unique_dt     = np.sort(np.unique(delta_rounded))
+    total_angle   = float(angles_per_turn[-1][-1] - angles_per_turn[0][0])
+
+    # InterlacedScanTime — duration at minimum (slowest) velocity
+    scan_time_min = total_angle * frame_time / float(unique_dt[0])
+
+    # --- build efficiency rows ---
+    rows = []
+    for dt in unique_dt:
+        vel       = dt / frame_time
+        t_scan    = total_angle * frame_time / dt
+        collected = 1 + int(np.sum(delta_rounded >= dt))
+        dropped   = total_frames - collected
+        eff       = 100.0 * collected / total_frames
+        rows.append(dict(delta_theta=dt, velocity=vel, scan_time=t_scan,
+                         collected=collected, dropped=dropped, efficiency=eff))
+
+    # Last row whose efficiency meets or exceeds the requested value
+    req = float(InterlacedEfficiencyRequested)
+    selected_idx = None
+    for i, row in enumerate(rows):
+        if row['efficiency'] >= req:
+            selected_idx = i
+
+    # --- print report ---
+    W = 82
+    print(f"\n{'='*W}")
+    print(f"  Interlaced Scan Efficiency  —  Mode {InterlacedMode}: {mode_names[InterlacedMode]}")
+    print(f"  N={N} angles/turn | K={K} turns | {start:.1f}° → {stop:.1f}°")
+    ft_src = "override" if frame_time_override is not None else f"exposure {exposure_time*1e3:.3f} ms"
+    print(f"  Frame time: {frame_time*1e3:.3f} ms  ({ft_src})")
+    print(f"  InterlacedPSOWindowStep: {pso_step:.4f}°  |  Total frames: {total_frames}")
+    print(f"  InterlacedScanTime (min vel): {scan_time_min:.2f} s  |  {len(unique_dt)} distinct Δθ values")
+    print(f"  Efficiency requested: {InterlacedEfficiencyRequested}%")
+    print(f"{'='*W}")
+    print()
+    print(f"  At velocity Vᵢ = Δθᵢ / frame_time the stage moves Δθᵢ per frame.")
+    print(f"  Frames preceded by a gap < Δθᵢ cannot be read out in time and are DROPPED.")
+    print()
+
+    cols = (4, 12, 15, 14, 11, 9, 11)
+    header = (
+        f"  {'#':>{cols[0]}}    {'Δθ (°)':>{cols[1]}}  {'Vel (°/s)':>{cols[2]}}"
+        f"  {'Scan time (s)':>{cols[3]}}  {'Collected':>{cols[4]}}"
+        f"  {'Dropped':>{cols[5]}}  {'Efficiency':>{cols[6]}}"
+    )
+    sep_len = sum(cols) + 2 * len(cols) + 3
+    print(header)
+    print(f"  {'-' * sep_len}")
+
+    for i, row in enumerate(rows):
+        marker = "X" if i == selected_idx else " "
+        print(
+            f"  {i:>{cols[0]}}  {marker}  {row['delta_theta']:>{cols[1]}.6f}"
+            f"  {row['velocity']:>{cols[2]}.4f}  {row['scan_time']:>{cols[3]}.2f}"
+            f"  {row['collected']:>{cols[4]}d}  {row['dropped']:>{cols[5]}d}"
+            f"  {row['efficiency']:>{cols[6]-1}.1f}%"
+        )
+
+    if selected_idx is not None:
+        sr = rows[selected_idx]
+        print(
+            f"\n  [X] Row {selected_idx} selected: "
+            f"Δθ={sr['delta_theta']:.6f}°  Vel={sr['velocity']:.4f}°/s  "
+            f"Eff={sr['efficiency']:.1f}%  Scan time={sr['scan_time']:.2f} s"
+        )
+    else:
+        print(f"\n  No row meets the requested efficiency of {InterlacedEfficiencyRequested}%")
+
+    print(f"\n{'='*W}\n")
+    if selected_idx is None:
+        return None
+    return rows[selected_idx]
+
+
+def main(plot=False, efficiency=100):
+    num_angles = 100
+    K_interlace = 4
     rotation_start = 0.0
     rotation_stop = 360.0
+    exposure_time = 0.1          # seconds
     degrees = True
     show_monotonic = True
     dr = 0.25
@@ -601,12 +909,25 @@ def main():
         rotation_stop=rotation_stop,
         degrees=degrees,
     )
-    angles_tb, theta_tb, theta_tb_mono = compute_timbir_multiturn_angles(
-        num_angles=num_angles,
-        K_interlace=K_interlace,
-        rotation_start=rotation_start,
-        degrees=degrees,
-    )
+    if _is_power_of_two(K_interlace):
+        angles_tb, theta_tb, theta_tb_mono = compute_timbir_multiturn_angles(
+            num_angles=num_angles,
+            K_interlace=K_interlace,
+            rotation_start=rotation_start,
+            degrees=degrees,
+        )
+        timbir_dataset = {
+            "angles_per_turn": angles_tb,
+            "theta_interlaced": theta_tb,
+            "theta_monotonic": theta_tb_mono,
+            "title": "TIMBIR",
+        }
+    else:
+        timbir_dataset = {
+            "title": "TIMBIR",
+            "unavailable": True,
+            "message": f"TIMBIR only works with a\npower-of-2 number of turns\n(K = 1, 2, 4, 8, …)\nGot K={K_interlace}.",
+        }
 
     datasets = [
         {
@@ -627,28 +948,38 @@ def main():
             "theta_monotonic": theta_vc_mono,
             "title": "Van der Corput",
         },
-        {
-            "angles_per_turn": angles_tb,
-            "theta_interlaced": theta_tb,
-            "theta_monotonic": theta_tb_mono,
-            "title": "TIMBIR",
-        },
+        timbir_dataset,
     ]
 
-    polar_plot_interlaced_grid(
-        datasets,
-        degrees=degrees,
-        show_monotonic=show_monotonic,
-        dr=dr,
-    )
+    if plot:
+        polar_plot_interlaced_grid(
+            datasets,
+            degrees=degrees,
+            show_monotonic=show_monotonic,
+            dr=dr,
+        )
 
-    plot_delta_angle_distributions(
-        datasets,
-        degrees=degrees,
-    )
+        plot_delta_angle_distributions(
+            datasets,
+            degrees=degrees,
+        )
 
-    plot_distinct_deltas_vs_N_K()
+        plot_distinct_deltas_vs_N_K()
+
+    for mode in range(4):
+        pv_callback_efficiency(
+            InterlacedRotationStart=rotation_start,
+            InterlacedNumAngles=num_angles,
+            InterlacedNumberOfRotation=K_interlace,
+            InterlacedMode=mode,
+            rotation_stop=rotation_stop,
+            exposure_time=exposure_time,
+            InterlacedEfficiencyRequested=efficiency,
+        )
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Interlaced scan angle analysis")
+    parser.add_argument("--plot", action="store_true", help="Show matplotlib plots")
+    args = parser.parse_args()
+    main(plot=args.plot)
