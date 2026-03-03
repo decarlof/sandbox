@@ -38,7 +38,7 @@ def compute_equally_spaced_multiturn_angles(
     n = np.arange(N, dtype=float)
     angles_per_turn = []
     for k in range(K):
-        theta_n = rotation_start + (n + k / K) * rotation_step + 360.0 * k
+        theta_n = rotation_start + (n - k / K) * rotation_step + 360.0 * k
         angles_per_turn.append(theta_n)
 
     theta_interlaced = np.concatenate(angles_per_turn).astype(float)
@@ -695,6 +695,133 @@ def plot_blur_vs_angle(
     plt.show()
 
 
+def plot_equally_spaced_comparison(
+    num_angles=10,
+    K_interlace=4,
+    rotation_start=0.0,
+    rotation_stop=360.0,
+    frame_time=None,
+    exposure_time=0.1,
+    size_x=2048,
+    degrees=True,
+    dr=0.25,
+):
+    """Compare the old (+k/K offset) and new (-k/K offset) Equally Spaced formulas.
+
+    Shows a 2×2 page:
+      top row    — polar acquisition plots (old | new)
+      bottom row — Δθ count distributions  (old | new)
+    """
+    N = int(num_angles)
+    K = int(K_interlace)
+    rotation_step = (rotation_stop - rotation_start) / N
+    n_arr = np.arange(N, dtype=float)
+    unit  = "°" if degrees else "rad"
+
+    # OLD formula: first frame of turn k is k/K * step ABOVE k×360°
+    angles_old = [rotation_start + (n_arr + k / K) * rotation_step + 360.0 * k
+                  for k in range(K)]
+    # NEW formula: first frame of turn k is k/K * step BELOW k×360°
+    angles_new = [rotation_start + (n_arr - k / K) * rotation_step + 360.0 * k
+                  for k in range(K)]
+
+    fig = plt.figure(figsize=(14, 10))
+    fig.suptitle(
+        f"Equally Spaced interlaced — offset comparison  (N={N}, K={K}, step={rotation_step:.3f}°)\n"
+        f"Left: first frame ABOVE k×360°  (old  +k/K·step) | "
+        f"Right: first frame BELOW k×360°  (new  −k/K·step)",
+        fontsize=11,
+    )
+
+    ax_pol_old = fig.add_subplot(2, 2, 1, projection="polar")
+    ax_pol_new = fig.add_subplot(2, 2, 2, projection="polar")
+    ax_cnt_old = fig.add_subplot(2, 2, 3)
+    ax_cnt_new = fig.add_subplot(2, 2, 4)
+
+    colors = plt.cm.tab10.colors
+
+    # --- polar plots (top row) ---
+    for ax_pol, angles_per_turn, label in [
+        (ax_pol_old, angles_old, "old: +k/K·step"),
+        (ax_pol_new, angles_new, "new: −k/K·step"),
+    ]:
+        theta_mono = np.sort(np.concatenate(angles_per_turn))
+        polar_plot_interlaced(
+            angles_per_turn,
+            np.concatenate(angles_per_turn),
+            theta_mono,
+            title=label,
+            degrees=degrees,
+            dr=dr,
+            ax=ax_pol,
+        )
+
+    # --- count distribution plots (bottom row) ---
+    # Determine shared x-axis limits across both datasets
+    all_deltas = [
+        compute_delta_angles_acquisition_order(angles_old),
+        compute_delta_angles_acquisition_order(angles_new),
+    ]
+    global_min = min(d.min() for d in all_deltas)
+    global_max = max(d.max() for d in all_deltas)
+    margin = (global_max - global_min) * 0.15 or 0.5
+    shared_xlim = (global_min - margin, global_max + margin)
+    shared_ylim = None
+
+    ax_cnt_list = []
+    for ax_cnt, angles_per_turn, delta, label, ci in [
+        (ax_cnt_old, angles_old, all_deltas[0], "old: +k/K·step", 0),
+        (ax_cnt_new, angles_new, all_deltas[1], "new: −k/K·step", 1),
+    ]:
+        delta_rounded = np.round(delta, decimals=6)
+        unique_vals   = np.sort(np.unique(delta_rounded))
+        counts        = {v: int(np.sum(delta_rounded == v)) for v in unique_vals}
+        vals          = np.array(sorted(counts.keys()))
+        cnts          = np.array([counts[v] for v in vals])
+
+        total_frames = N * K
+        total_angle  = float(angles_per_turn[-1][-1] - angles_per_turn[0][0])
+
+        c = colors[ci % len(colors)]
+        ml, sl, _ = ax_cnt.stem(vals, cnts, linefmt="-", markerfmt="o", basefmt=" ")
+        ml.set_color(c); ml.set_markersize(6)
+        sl.set_color(c); sl.set_linewidth(2)
+
+        for v, cnt in zip(vals, cnts):
+            collected = 1 + int(np.sum(delta_rounded >= v))
+            eff       = 100.0 * collected / total_frames
+            lbl       = f"{v:.3f}{unit}\n(n={cnt})\n{eff:.1f}%"
+            if frame_time is not None:
+                vel    = v / frame_time
+                t_scan = total_angle * frame_time / v
+                lbl   += f"\nV={vel:.2f}°/s\nT={t_scan:.1f}s"
+                if size_x is not None:
+                    blur_px = size_x * np.sin(np.radians(vel * exposure_time) / 2)
+                    lbl    += f"\nB={blur_px:.2f}px"
+            ax_cnt.annotate(lbl, xy=(v, cnt), xytext=(0, 8),
+                            textcoords="offset points", ha="center", fontsize=7)
+
+        ax_cnt.set_title(f"Δθ distribution — {label}", fontsize=10, fontweight="bold")
+        ax_cnt.set_xlabel(rf"$\Delta\theta$ ({unit})")
+        ax_cnt.set_ylabel("Count")
+        ax_cnt.set_xlim(shared_xlim)
+        ax_cnt.set_ylim(0, cnts.max() * 1.5)
+        ax_cnt.text(0.02, 0.97, f"N={N}, K={K}",
+                    transform=ax_cnt.transAxes, va="top", ha="left", fontsize=8,
+                    bbox=dict(boxstyle="round,pad=0.3", facecolor="white",
+                              alpha=0.7, edgecolor="none"))
+        ax_cnt.grid(True, alpha=0.3)
+        ax_cnt_list.append(ax_cnt)
+
+    # Unify y-axis across both count subplots
+    shared_ylim = max(ax.get_ylim()[1] for ax in ax_cnt_list)
+    for ax in ax_cnt_list:
+        ax.set_ylim(0, shared_ylim)
+
+    plt.tight_layout()
+    plt.show()
+
+
 def compute_frame_time(
     exposure_time,
     camera_model="Grasshopper3 GS3-U3-23S6M",
@@ -1040,6 +1167,18 @@ def main(plot=False, efficiency=100):
     ]
 
     if plot:
+        plot_equally_spaced_comparison(
+            num_angles=num_angles,
+            K_interlace=K_interlace,
+            rotation_start=rotation_start,
+            rotation_stop=rotation_stop,
+            frame_time=compute_frame_time(exposure_time),
+            exposure_time=exposure_time,
+            size_x=size_x,
+            degrees=degrees,
+            dr=dr,
+        )
+
         polar_plot_interlaced_grid(
             datasets,
             degrees=degrees,
