@@ -299,6 +299,9 @@ def count_distinct_deltas(delta, decimals=6):
 def plot_delta_angle_distributions(
     datasets,
     degrees=True,
+    frame_time=None,
+    exposure_time=None,
+    size_x=None,
     suptitle=(
         r"$\Delta\theta$ between consecutive frames (acquisition order)"
         "\n— determines minimum detector exposure time at a given rotation speed —"
@@ -377,11 +380,20 @@ def plot_delta_angle_distributions(
 
             total_frames = N * K
             delta_rounded = np.round(delta, decimals=6)
+            total_angle = float(angles_per_turn[-1][-1] - angles_per_turn[0][0])
             for v, c in zip(vals, cnts):
                 collected = 1 + int(np.sum(delta_rounded >= v))
                 eff = 100.0 * collected / total_frames
+                label = f"{v:.3f}{unit}\n(n={c})\n{eff:.1f}%"
+                if frame_time is not None:
+                    vel = v / frame_time
+                    t_scan = total_angle * frame_time / v
+                    label += f"\nV={vel:.2f}°/s\nT={t_scan:.1f}s"
+                    if exposure_time is not None and size_x is not None:
+                        blur_px = size_x * np.sin(np.radians(vel * exposure_time) / 2)
+                        label += f"\nB={blur_px:.2f}px"
                 ax_hist.annotate(
-                    f"{v:.3f}{unit}\n(n={c})\n{eff:.1f}%",
+                    label,
                     xy=(v, c), xytext=(0, 8),
                     textcoords="offset points",
                     ha="center", fontsize=6,
@@ -402,15 +414,6 @@ def plot_delta_angle_distributions(
             y_top = ax_hist.get_ylim()[1]
             ax_hist.set_ylim(0, y_top * 1.15)
 
-        ax_hist.axvline(
-            np.min(delta), color="green", ls=":", lw=1.5,
-            label=f"min = {np.min(delta):.3f}{unit}",
-        )
-        ax_hist.axvline(
-            np.max(delta), color="purple", ls=":", lw=1.5,
-            label=f"max = {np.max(delta):.3f}{unit}",
-        )
-
         title_str = ds["title"]
         title_str += f" ({n_unique} distinct values)"
         if has_negative:
@@ -419,7 +422,6 @@ def plot_delta_angle_distributions(
         ax_hist.set_xlabel(rf"$\Delta\theta$ ({unit})")
         ax_hist.set_ylabel("Count")
         ax_hist.set_xlim(shared_xlim)
-        ax_hist.legend(fontsize=7, loc="upper right")
         ax_hist.text(0.02, 0.97, f"N={N}, K={K}",
                      transform=ax_hist.transAxes, va="top", ha="left",
                      fontsize=8,
@@ -611,6 +613,88 @@ def plot_distinct_deltas_vs_N_K(
                 except (ValueError, AssertionError):
                     pass
 
+def plot_blur_vs_angle(
+    datasets,
+    frame_time,
+    exposure_time,
+    size_x=2048,
+):
+    N = len(datasets[0]["angles_per_turn"][0]) if not datasets[0].get("unavailable") else "?"
+    K = len(datasets[0]["angles_per_turn"])    if not datasets[0].get("unavailable") else "?"
+
+    n_plots = len(datasets)
+    ncols = min(n_plots, 2)
+    nrows = int(np.ceil(n_plots / ncols))
+
+    fig, axes = plt.subplots(nrows, ncols, figsize=(7 * ncols, 5 * nrows), sharey=True)
+    if nrows == 1 and ncols == 1:
+        axes = np.array([[axes]])
+    elif nrows == 1 or ncols == 1:
+        axes = np.array(axes).reshape(nrows, ncols)
+
+    fig.suptitle(
+        f"Projected motion blur vs. acquisition angle  —  N={N}, K={K}\n"
+        f"exposure={exposure_time*1e3:.1f} ms, "
+        f"frame time={frame_time*1e3:.3f} ms, "
+        f"detector size_x={size_x} px\n"
+        r"blur$(\theta)$ = $(size\_x/2)\cdot|\sin\theta|\cdot\omega\cdot t_{exp}$"
+        "   [worst-case feature at detector edge]",
+        fontsize=11,
+    )
+
+    r = size_x / 2.0
+
+    for idx, (ax, ds) in enumerate(zip(axes.flat, datasets)):
+        if ds.get("unavailable"):
+            ax.text(0.5, 0.5, ds.get("message", "Not available"),
+                    transform=ax.transAxes, ha="center", va="center",
+                    fontsize=10, color="gray", style="italic")
+            ax.set_title(ds.get("title", ""), fontsize=11, fontweight="bold")
+            ax.set_xlabel("Acquisition angle (°)")
+            ax.set_ylabel("Projected motion blur (px)")
+            ax.grid(True, alpha=0.3)
+            continue
+
+        angles_per_turn = ds["angles_per_turn"]
+        theta_acq = np.concatenate(angles_per_turn)
+        delta     = np.diff(theta_acq)
+
+        preceding_gaps     = np.empty(len(theta_acq))
+        preceding_gaps[0]  = delta.min()
+        preceding_gaps[1:] = delta
+        velocities = preceding_gaps / frame_time   # °/s
+
+        blur_proj = r * np.radians(velocities * exposure_time) * np.abs(np.sin(np.radians(theta_acq)))
+
+        # Sinusoidal envelope over the full acquisition range
+        total_angle = float(angles_per_turn[-1][-1] - angles_per_turn[0][0])
+        theta_env   = np.linspace(0, total_angle, 2000)
+        sin_env     = np.abs(np.sin(np.radians(theta_env)))
+
+        # One color per distinct velocity
+        vel_rounded = np.round(velocities, decimals=6)
+        unique_vels = np.sort(np.unique(vel_rounded))
+        vel_colors  = plt.cm.viridis(np.linspace(0.1, 0.9, len(unique_vels)))
+
+        for vi, vel in enumerate(unique_vels):
+            mask  = vel_rounded == vel
+            c_vel = vel_colors[vi]
+            ax.scatter(theta_acq[mask], blur_proj[mask],
+                       s=20, alpha=0.85, color=c_vel, zorder=3)
+            ax.plot(theta_env, r * np.radians(vel * exposure_time) * sin_env,
+                    color=c_vel, lw=1.5, alpha=0.75, label=f"V={vel:.2f}°/s")
+
+        ax.axhline(1.0, color="k", lw=0.8, ls=":", alpha=0.6, label="Nyquist (1 px)")
+        ax.set_title(ds["title"], fontsize=11, fontweight="bold")
+        ax.set_xlabel("Acquisition angle (°)")
+        ax.set_ylabel("Projected motion blur (px)")
+        ax.legend(fontsize=7, loc="upper right")
+        ax.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    plt.show()
+
+
 def compute_frame_time(
     exposure_time,
     camera_model="Grasshopper3 GS3-U3-23S6M",
@@ -705,6 +789,7 @@ def pv_callback_efficiency(
     rotation_stop=360.0,
     frame_time_override=None,
     InterlacedEfficiencyRequested=100,
+    size_x=2048,
 ):
     """Compute and report acquisition efficiency for the selected interlaced mode.
 
@@ -816,8 +901,10 @@ def pv_callback_efficiency(
         collected = 1 + int(np.sum(delta_rounded >= dt))
         dropped   = total_frames - collected
         eff       = 100.0 * collected / total_frames
+        blur_px   = size_x * np.sin(np.radians(vel * exposure_time) / 2)
         rows.append(dict(delta_theta=dt, velocity=vel, scan_time=t_scan,
-                         collected=collected, dropped=dropped, efficiency=eff))
+                         collected=collected, dropped=dropped, efficiency=eff,
+                         blur_px=blur_px))
 
     # Last row whose efficiency meets or exceeds the requested value
     req = float(InterlacedEfficiencyRequested)
@@ -827,7 +914,7 @@ def pv_callback_efficiency(
             selected_idx = i
 
     # --- print report ---
-    W = 82
+    W = 94
     print(f"\n{'='*W}")
     print(f"  Interlaced Scan Efficiency  —  Mode {InterlacedMode}: {mode_names[InterlacedMode]}")
     print(f"  N={N} angles/turn | K={K} turns | {start:.1f}° → {stop:.1f}°")
@@ -835,18 +922,18 @@ def pv_callback_efficiency(
     print(f"  Frame time: {frame_time*1e3:.3f} ms  ({ft_src})")
     print(f"  InterlacedPSOWindowStep: {pso_step:.4f}°  |  Total frames: {total_frames}")
     print(f"  InterlacedScanTime (min vel): {scan_time_min:.2f} s  |  {len(unique_dt)} distinct Δθ values")
-    print(f"  Efficiency requested: {InterlacedEfficiencyRequested}%")
+    print(f"  Efficiency requested: {InterlacedEfficiencyRequested}%  |  Image size_x: {size_x} px")
     print(f"{'='*W}")
     print()
     print(f"  At velocity Vᵢ = Δθᵢ / frame_time the stage moves Δθᵢ per frame.")
     print(f"  Frames preceded by a gap < Δθᵢ cannot be read out in time and are DROPPED.")
     print()
 
-    cols = (4, 12, 15, 14, 11, 9, 11)
+    cols = (4, 12, 15, 14, 11, 9, 11, 10)
     header = (
         f"  {'#':>{cols[0]}}    {'Δθ (°)':>{cols[1]}}  {'Vel (°/s)':>{cols[2]}}"
         f"  {'Scan time (s)':>{cols[3]}}  {'Collected':>{cols[4]}}"
-        f"  {'Dropped':>{cols[5]}}  {'Efficiency':>{cols[6]}}"
+        f"  {'Dropped':>{cols[5]}}  {'Efficiency':>{cols[6]}}  {'Blur (px)':>{cols[7]}}"
     )
     sep_len = sum(cols) + 2 * len(cols) + 3
     print(header)
@@ -858,7 +945,7 @@ def pv_callback_efficiency(
             f"  {i:>{cols[0]}}  {marker}  {row['delta_theta']:>{cols[1]}.6f}"
             f"  {row['velocity']:>{cols[2]}.4f}  {row['scan_time']:>{cols[3]}.2f}"
             f"  {row['collected']:>{cols[4]}d}  {row['dropped']:>{cols[5]}d}"
-            f"  {row['efficiency']:>{cols[6]-1}.1f}%"
+            f"  {row['efficiency']:>{cols[6]-1}.1f}%  {row['blur_px']:>{cols[7]}.2f}"
         )
 
     if selected_idx is not None:
@@ -866,7 +953,7 @@ def pv_callback_efficiency(
         print(
             f"\n  [X] Row {selected_idx} selected: "
             f"Δθ={sr['delta_theta']:.6f}°  Vel={sr['velocity']:.4f}°/s  "
-            f"Eff={sr['efficiency']:.1f}%  Scan time={sr['scan_time']:.2f} s"
+            f"Eff={sr['efficiency']:.1f}%  Scan time={sr['scan_time']:.2f} s  Blur={sr['blur_px']:.2f} px"
         )
     else:
         print(f"\n  No row meets the requested efficiency of {InterlacedEfficiencyRequested}%")
@@ -878,11 +965,12 @@ def pv_callback_efficiency(
 
 
 def main(plot=False, efficiency=100):
-    num_angles = 100
+    num_angles = 10
     K_interlace = 4
     rotation_start = 0.0
     rotation_stop = 360.0
     exposure_time = 0.1          # seconds
+    size_x        = 2048         # detector horizontal size in pixels
     degrees = True
     show_monotonic = True
     dr = 0.25
@@ -962,9 +1050,19 @@ def main(plot=False, efficiency=100):
         plot_delta_angle_distributions(
             datasets,
             degrees=degrees,
+            frame_time=compute_frame_time(exposure_time),
+            exposure_time=exposure_time,
+            size_x=size_x,
         )
 
         plot_distinct_deltas_vs_N_K()
+
+        plot_blur_vs_angle(
+            datasets,
+            frame_time=compute_frame_time(exposure_time),
+            exposure_time=exposure_time,
+            size_x=size_x,
+        )
 
     for mode in range(4):
         pv_callback_efficiency(
@@ -975,6 +1073,7 @@ def main(plot=False, efficiency=100):
             rotation_stop=rotation_stop,
             exposure_time=exposure_time,
             InterlacedEfficiencyRequested=efficiency,
+            size_x=size_x,
         )
 
 
