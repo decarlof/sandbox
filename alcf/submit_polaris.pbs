@@ -1,0 +1,44 @@
+#!/bin/bash
+
+#PBS -A 14347
+#PBS -l select=2:system=polaris
+#PBS -l place=scatter
+#PBS -l filesystems=home:grand:eagle
+#PBS -l walltime=00:10:00
+#PBS -q debug
+#PBS -M vnikitin@anl.gov
+
+echo Working directory is $PBS_O_WORKDIR
+cd $PBS_O_WORKDIR
+
+echo Jobid: $PBS_JOBID
+echo Running on host `hostname`
+echo Running on nodes `cat $PBS_NODEFILE`
+
+NNODES=`wc -l < $PBS_NODEFILE`
+NRANKS=4
+NTHREADS=4
+NDEPTH=8
+
+export NTOTRANKS=$(( NNODES * NRANKS ))
+
+echo "NUM_OF_NODES=${NNODES} TOTAL_NUM_RANKS=${NTOTRANKS} RANKS_PER_NODE=${NRANKS}"
+
+export NCCL_COLLNET_ENABLE=1
+export NCCL_NET_GDR_LEVEL=PHB
+export NCCL_SOCKET_IFNAME=hsn1
+
+module use /soft/modulefiles
+module load conda
+conda activate base
+
+CONDA_NAME=$(echo ${CONDA_PREFIX} | tr '\/' '\t' | sed -E 's/mconda3|\/base//g' | awk '{print $NF}')
+VENV_DIR="/home/vvnikitin/venvs/${CONDA_NAME}"
+source "${VENV_DIR}/bin/activate"
+
+mpiexec -n ${NTOTRANKS} \
+        --ppn ${NRANKS} \
+        --depth=${NDEPTH} \
+        --cpu-bind depth \
+        --env OMP_NUM_THREADS=${NTHREADS} \
+        ./set_affinity_gpu_polaris.sh python hello_world.py
