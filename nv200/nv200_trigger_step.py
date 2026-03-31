@@ -1,71 +1,64 @@
 """
-Piezosystem Jena NV200/D NET — triggered step mode via EPICS IOC.
+Piezosystem Jena NV200/D NET — triggered step mode over Ethernet (Telnet).
 
 Loads up to 1024 positions into the arbitrary waveform generator buffer.
 Each rising edge on the TRG IN connector (pin 3 of the I/O D-Sub, TTL 0/3.3-5V)
 advances the actuator to the next position.
 
 Usage:
-    1. Set the PV prefix for each axis (e.g. 'JenaNV200D:jena1').
-    2. Define your list of positions in physical units (µm or mrad).
-    3. Run the script. The actuator is ready when "Running" is printed.
-    4. Each TTL rising edge on TRG IN steps to the next position.
-    5. Press Enter to stop and restore manual control.
+    1. Stop the EPICS IOC (only one Telnet connection allowed at a time).
+    2. Run this script.
+    3. Each TTL rising edge on TRG IN steps to the next position.
+    4. Press Enter to stop and restore manual control, then restart the IOC.
 
 Notes:
-    - Commands are sent via EPICS PVs (<prefix>:write / <prefix>:read),
-      so the IOC Telnet connection is reused — no conflict.
     - Requires a sensor-equipped actuator for closed loop (cl=1).
     - Positions must be within the actuator's closed-loop stroke range.
     - gtarb,65535 sets a ~3.3 s auto-advance fallback; in practice the trigger
       drives the steps.
 """
 
+import socket
 import time
-import epics
 import numpy as np
 
 
 class NV200NET:
+    PROMPT = b'NV200/D NET>'
 
-    def __init__(self, pv_prefix):
-        """
-        Parameters
-        ----------
-        pv_prefix : str
-            EPICS PV prefix, e.g. 'JenaNV200D:jena1'
-            Expects <prefix>:write and <prefix>:read PVs.
-        """
-        self._pv_write = epics.PV(f'{pv_prefix}:write')
-        self._pv_read  = epics.PV(f'{pv_prefix}:read')
-        time.sleep(0.2)  # allow CA connection and type detection to complete
-        if not self._pv_write.connected:
-            raise RuntimeError(f'Cannot connect to {pv_prefix}:write')
+    def __init__(self, ip, port=23, timeout=10.0):
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.sock.settimeout(timeout)
+        self.sock.connect((ip, port))
+        self._read_until_prompt()  # consume banner/prompt on connect
+
+    def _read_until_prompt(self, timeout=5.0):
+        buf = b''
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            try:
+                chunk = self.sock.recv(256)
+                if chunk:
+                    # Strip Telnet IAC negotiation bytes (0xFF sequences)
+                    chunk = bytes(b for b in chunk if b < 0xFF)
+                    buf += chunk
+                    if self.PROMPT in buf:
+                        return buf
+            except socket.timeout:
+                break
+        return buf
 
     def cmd(self, command):
-        """Send a raw ASCII command and return the response."""
-        self._pv_write.put(command, wait=True)
-        time.sleep(0.05)
-        response = self._pv_read.get(as_string=True) or ''
-        if response.startswith('error'):
-            raise RuntimeError(f'Device error on "{command}": {response}')
-        return response
-
-    def load_positions(self, positions):
-        """
-        Write positions into the waveform buffer using gparb (physical units: µm or mrad).
-        Positions are clamped to [0, 100] % of stroke if you prefer relative units
-        use gbarb instead (values 0.0–100.0).
-        """
-        n = len(positions)
-        if n > 1024:
-            raise ValueError(f'Maximum 1024 positions, got {n}')
-        print(f'Loading {n} positions into buffer...', flush=True)
-        for i, pos in enumerate(positions):
-            self.cmd(f'gparb,{i},{pos:.4f}')
-            if (i + 1) % 128 == 0 or i == n - 1:
-                print(f'  {i + 1}/{n}', flush=True)
-        print('Buffer loaded.')
+        """Send a command, wait for the prompt, and return the response text."""
+        self.sock.sendall((command + '\r').encode())
+        raw = self._read_until_prompt()
+        # Decode and strip prompt + echoed command
+        text = raw.replace(self.PROMPT, b'').decode(errors='replace').strip()
+        if text.startswith(command):
+            text = text[len(command):].strip()
+        if text.startswith('error'):
+            raise RuntimeError(f'Device error on "{command}": {text}')
+        return text
 
     def stroke(self):
         """Return (posmin, posmax) in physical units as reported by the device."""
@@ -78,6 +71,18 @@ class NV200NET:
         posmin, posmax = self.stroke()
         print(f'Actuator stroke: {posmin} … {posmax} (physical units)')
         return list(np.linspace(posmin, posmax, n))
+
+    def load_positions(self, positions):
+        """Write positions into the waveform buffer (physical units: µm or mrad)."""
+        n = len(positions)
+        if n > 1024:
+            raise ValueError(f'Maximum 1024 positions, got {n}')
+        print(f'Loading {n} positions into buffer...', flush=True)
+        for i, pos in enumerate(positions):
+            self.cmd(f'gparb,{i},{pos:.4f}')
+            if (i + 1) % 128 == 0 or i == n - 1:
+                print(f'  {i + 1}/{n}', flush=True)
+        print('Buffer loaded.')
 
     def setup_triggered_step(self, positions=None, n=1024, closed_loop=True):
         """
@@ -136,7 +141,6 @@ class NV200NET:
         """Persist the waveform buffer to EEPROM (survives power cycles)."""
         print('Saving buffer to EEPROM...')
         self.sock.sendall(b'gsave\r')
-        # gsave acknowledges with CR LF — wait for prompt
         self._read_until_prompt(timeout=15.0)
         print('Saved.')
 
@@ -149,9 +153,9 @@ class NV200NET:
 
     def stop(self):
         """Stop the waveform generator and restore direct command control."""
-        self.cmd('grun,0')     # stop waveform generator
-        self.cmd('trgfkt,0')   # disable trigger function
-        self.cmd('modsrc,0')   # setpoint back to USB/Ethernet commands
+        self.cmd('grun,0')
+        self.cmd('trgfkt,0')
+        self.cmd('modsrc,0')
         print('Stopped. Manual control restored.')
 
     def position(self):
@@ -159,13 +163,16 @@ class NV200NET:
         return float(self.cmd('meas'))
 
     def close(self):
-        pass  # no socket to close; IOC manages the connection
+        self.sock.close()
 
 
 if __name__ == '__main__':
 
-    ctrl_x = NV200NET('JenaNV200D:jena1')
-    ctrl_y = NV200NET('JenaNV200D:jena2')
+    IP_X = '10.54.113.126'
+    IP_Y = '10.54.113.125'
+
+    ctrl_x = NV200NET(IP_X)
+    ctrl_y = NV200NET(IP_Y)
     try:
         # Passing positions=None auto-generates 1024 steps spanning the full stroke.
         # Or pass your own list: setup_triggered_step(positions=[0, 10, 20, ...])
@@ -174,7 +181,7 @@ if __name__ == '__main__':
         print('--- Y axis ---')
         ctrl_y.setup_triggered_step(positions=None, n=1024, closed_loop=True)
 
-        # Uncomment to save positions to EEPROM (load later with ctrl.load_from_eeprom())
+        # Uncomment to save to EEPROM (persists across power cycles)
         # ctrl_x.save_to_eeprom()
         # ctrl_y.save_to_eeprom()
 
