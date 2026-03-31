@@ -52,10 +52,14 @@ class NV200NET:
         """Send a command, wait for the prompt, and return the response text."""
         self.sock.sendall((command + '\r').encode())
         raw = self._read_until_prompt()
-        # Decode and strip prompt + echoed command
-        text = raw.replace(self.PROMPT, b'').decode(errors='replace').strip()
+        # Strip null bytes, prompt, then decode
+        raw = raw.replace(b'\x00', b'').replace(self.PROMPT, b'')
+        text = raw.decode(errors='replace').strip()
+        # Strip echoed command prefix (device echoes e.g. "posmin,0.000")
         if text.startswith(command):
             text = text[len(command):].strip()
+        # Strip leading comma (response format is "command,value")
+        text = text.lstrip(',').strip()
         if text.startswith('error'):
             raise RuntimeError(f'Device error on "{command}": {text}')
         return text
