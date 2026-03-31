@@ -78,17 +78,44 @@ class NV200NET:
                 print(f'  {i + 1}/{n}', flush=True)
         print('Buffer loaded.')
 
-    def setup_triggered_step(self, positions, closed_loop=True):
+    def stroke(self):
+        """Return (posmin, posmax) in physical units as reported by the device."""
+        posmin = float(self.cmd('posmin'))
+        posmax = float(self.cmd('posmax'))
+        return posmin, posmax
+
+    def linspace_positions(self, n=1024):
+        """Return n evenly spaced positions spanning the full actuator stroke."""
+        posmin, posmax = self.stroke()
+        print(f'Actuator stroke: {posmin} … {posmax} (physical units)')
+        return list(np.linspace(posmin, posmax, n))
+
+    def setup_triggered_step(self, positions=None, n=1024, closed_loop=True):
         """
         Configure the device so each rising edge on TRG IN moves to the next position.
 
         Parameters
         ----------
-        positions : list of float
+        positions : list of float or None
             Positions in physical units (µm or mrad). Max 1024 values.
+            If None, n evenly spaced positions spanning the full stroke are used.
+        n : int
+            Number of positions to generate when positions=None.
         closed_loop : bool
             True for closed loop (requires sensor), False for open loop.
         """
+        if positions is None:
+            positions = self.linspace_positions(n)
+
+        # Validate against device stroke limits
+        posmin, posmax = self.stroke()
+        out_of_range = [p for p in positions if p < posmin or p > posmax]
+        if out_of_range:
+            raise ValueError(
+                f'{len(out_of_range)} position(s) outside actuator range '
+                f'[{posmin}, {posmax}]: e.g. {out_of_range[0]}'
+            )
+
         n = len(positions)
 
         # Control mode
@@ -148,20 +175,26 @@ class NV200NET:
 
 if __name__ == '__main__':
 
-    IP = '192.168.x.x'   # <-- replace with your device IP
+    IP_X = '10.54.113.126'
+    IP_Y = '10.54.113.125'
 
-    # --- Define your 1024 positions here (in µm or mrad) ---
-    # Example: 1024 evenly spaced steps across a 100 µm stroke
-    positions = list(np.linspace(0, 100, 1024))
-
-    ctrl = NV200NET(IP)
+    ctrl_x = NV200NET(IP_X)
+    ctrl_y = NV200NET(IP_Y)
     try:
-        ctrl.setup_triggered_step(positions, closed_loop=True)
+        # Passing positions=None auto-generates 1024 steps spanning the full stroke.
+        # Or pass your own list: setup_triggered_step(positions=[0, 10, 20, ...])
+        print('--- X axis ---')
+        ctrl_x.setup_triggered_step(positions=None, n=1024, closed_loop=True)
+        print('--- Y axis ---')
+        ctrl_y.setup_triggered_step(positions=None, n=1024, closed_loop=True)
 
         # Uncomment to save positions to EEPROM (load later with ctrl.load_from_eeprom())
-        # ctrl.save_to_eeprom()
+        # ctrl_x.save_to_eeprom()
+        # ctrl_y.save_to_eeprom()
 
         input('\nPress Enter to stop...\n')
     finally:
-        ctrl.stop()
-        ctrl.close()
+        ctrl_x.stop()
+        ctrl_x.close()
+        ctrl_y.stop()
+        ctrl_y.close()
