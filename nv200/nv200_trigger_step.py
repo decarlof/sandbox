@@ -28,7 +28,7 @@ class NV200NET:
 
     def __init__(self, ip, port=23, timeout=10.0):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sock.settimeout(timeout)
+        self.sock.settimeout(2.0)  # short timeout keeps Ctrl+C responsive
         self.sock.connect((ip, port))
         self._read_until_prompt()  # consume banner/prompt on connect
 
@@ -181,9 +181,9 @@ if __name__ == '__main__':
         # Passing positions=None auto-generates 1024 steps spanning the full stroke.
         # Or pass your own list: setup_triggered_step(positions=[0, 10, 20, ...])
         print('--- X axis ---')
-        ctrl_x.setup_triggered_step(positions=None, n=1024, closed_loop=True)
+        ctrl_x.setup_triggered_step(positions=None, n=256, closed_loop=True)
         print('--- Y axis ---')
-        ctrl_y.setup_triggered_step(positions=None, n=1024, closed_loop=True)
+        ctrl_y.setup_triggered_step(positions=None, n=256, closed_loop=True)
 
         # Uncomment to save to EEPROM (persists across power cycles)
         # ctrl_x.save_to_eeprom()
