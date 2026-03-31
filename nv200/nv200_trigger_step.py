@@ -1,66 +1,52 @@
 """
-Piezosystem Jena NV200/D NET — triggered step mode over Ethernet.
+Piezosystem Jena NV200/D NET — triggered step mode via EPICS IOC.
 
 Loads up to 1024 positions into the arbitrary waveform generator buffer.
 Each rising edge on the TRG IN connector (pin 3 of the I/O D-Sub, TTL 0/3.3-5V)
 advances the actuator to the next position.
 
 Usage:
-    1. Set IP to your device's IP address (check via 'IP-Search' tool or DHCP lease).
+    1. Set the PV prefix for each axis (e.g. 'JenaNV200D:jena1').
     2. Define your list of positions in physical units (µm or mrad).
     3. Run the script. The actuator is ready when "Running" is printed.
     4. Each TTL rising edge on TRG IN steps to the next position.
     5. Press Enter to stop and restore manual control.
 
 Notes:
-    - Only one Telnet connection at a time is supported by the device.
+    - Commands are sent via EPICS PVs (<prefix>:write / <prefix>:read),
+      so the IOC Telnet connection is reused — no conflict.
     - Requires a sensor-equipped actuator for closed loop (cl=1).
     - Positions must be within the actuator's closed-loop stroke range.
     - gtarb,65535 sets a ~3.3 s auto-advance fallback; in practice the trigger
-      drives the steps. Increase gtarb if your trigger rate could exceed 0.3 Hz.
+      drives the steps.
 """
 
-import socket
 import time
+import epics
 import numpy as np
 
 
 class NV200NET:
-    PROMPT = b'NV200/D NET>'
 
-    def __init__(self, ip, port=23, timeout=10.0):
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sock.settimeout(timeout)
-        self.sock.connect((ip, port))
-        self._read_until_prompt()  # consume banner/prompt on connect
-
-    def _read_until_prompt(self, timeout=5.0):
-        buf = b''
-        deadline = time.time() + timeout
-        while time.time() < deadline:
-            try:
-                chunk = self.sock.recv(256)
-                if chunk:
-                    # Strip Telnet IAC negotiation bytes (0xFF sequences)
-                    chunk = bytes(b for b in chunk if b < 0xFF)
-                    buf += chunk
-                    if self.PROMPT in buf:
-                        return buf
-            except socket.timeout:
-                break
-        return buf
+    def __init__(self, pv_prefix):
+        """
+        Parameters
+        ----------
+        pv_prefix : str
+            EPICS PV prefix, e.g. 'JenaNV200D:jena1'
+            Expects <prefix>:write and <prefix>:read PVs.
+        """
+        self.pv_write = f'{pv_prefix}:write'
+        self.pv_read  = f'{pv_prefix}:read'
 
     def cmd(self, command):
-        """Send a command, wait for the prompt, and return the response text."""
-        self.sock.sendall((command + '\r').encode())
-        raw = self._read_until_prompt()
-        # Decode and strip prompt + echoed command
-        text = raw.replace(self.PROMPT, b'').decode(errors='replace').strip()
-        if text.startswith(command):
-            text = text[len(command):].strip()
-        if text.startswith('error'):
-            raise RuntimeError(f'Device error on "{command}": {text}')
-        return text
+        """Send a raw ASCII command and return the response."""
+        epics.caput(self.pv_write, command, wait=True)
+        time.sleep(0.05)
+        response = epics.caget(self.pv_read)
+        if response and response.startswith('error'):
+            raise RuntimeError(f'Device error on "{command}": {response}')
+        return response or ''
 
     def load_positions(self, positions):
         """
@@ -170,16 +156,13 @@ class NV200NET:
         return float(self.cmd('meas'))
 
     def close(self):
-        self.sock.close()
+        pass  # no socket to close; IOC manages the connection
 
 
 if __name__ == '__main__':
 
-    IP_X = '10.54.113.126'
-    IP_Y = '10.54.113.125'
-
-    ctrl_x = NV200NET(IP_X)
-    ctrl_y = NV200NET(IP_Y)
+    ctrl_x = NV200NET('JenaNV200D:jena1')
+    ctrl_y = NV200NET('JenaNV200D:jena2')
     try:
         # Passing positions=None auto-generates 1024 steps spanning the full stroke.
         # Or pass your own list: setup_triggered_step(positions=[0, 10, 20, ...])
