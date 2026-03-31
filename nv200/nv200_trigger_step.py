@@ -32,7 +32,7 @@ class NV200NET:
         self.sock.connect((ip, port))
         self._read_until_prompt()  # consume banner/prompt on connect
 
-    def _read_until_prompt(self, timeout=5.0):
+    def _read_until_prompt(self, timeout=1.0):
         buf = b''
         deadline = time.time() + timeout
         while time.time() < deadline:
@@ -51,7 +51,7 @@ class NV200NET:
     def cmd(self, command):
         """Send a command, wait for the prompt, and return the response text."""
         self.sock.sendall((command + '\r').encode())
-        raw = self._read_until_prompt()
+        raw = self._read_until_prompt()  # no sleep needed — prompt wait is the sync
         # Strip null bytes, prompt, then decode
         raw = raw.replace(b'\x00', b'').replace(self.PROMPT, b'')
         text = raw.decode(errors='replace').strip()
