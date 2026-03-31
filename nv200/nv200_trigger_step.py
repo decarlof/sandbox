@@ -36,17 +36,20 @@ class NV200NET:
             EPICS PV prefix, e.g. 'JenaNV200D:jena1'
             Expects <prefix>:write and <prefix>:read PVs.
         """
-        self.pv_write = f'{pv_prefix}:write'
-        self.pv_read  = f'{pv_prefix}:read'
+        self._pv_write = epics.PV(f'{pv_prefix}:write')
+        self._pv_read  = epics.PV(f'{pv_prefix}:read')
+        time.sleep(0.2)  # allow CA connection and type detection to complete
+        if not self._pv_write.connected:
+            raise RuntimeError(f'Cannot connect to {pv_prefix}:write')
 
     def cmd(self, command):
         """Send a raw ASCII command and return the response."""
-        epics.caput(self.pv_write, command, wait=True)
+        self._pv_write.put(command, wait=True)
         time.sleep(0.05)
-        response = epics.caget(self.pv_read)
-        if response and response.startswith('error'):
+        response = self._pv_read.get(as_string=True) or ''
+        if response.startswith('error'):
             raise RuntimeError(f'Device error on "{command}": {response}')
-        return response or ''
+        return response
 
     def load_positions(self, positions):
         """
