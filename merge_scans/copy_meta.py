@@ -1,7 +1,26 @@
 import h5py
 
-src = '/data2/2BM/2026-04-Herrera-1020972/VPPLT-1964_Y-18mm_007.h5'
-dst = '/data2/2BM/2026-04-Herrera-1020972/VPPLT-1964_Y-18mm_merged.h5'
+# src = '/data2/2BM/2026-04-Herrera-1020972/VPPLT-1964_Y-18mm_007.h5'
+# dst = '/data2/2BM/2026-04-Herrera-1020972/VPPLT-1964_Y-18mm_merged.h5'
+
+src = '/data2/2BM/2026-04-Herrera-1020972/VPPLT-1964_Y-23mm_021.h5'
+dst = '/data2/2BM/2026-04-Herrera-1020972/VPPLT-1964_Y-23mm_merged.h5'
+
+# src = '/data2/2BM/2026-04-Herrera-1020972/VPPLT-1964_Y-28mm_041.h5'
+# dst = '/data2/2BM/2026-04-Herrera-1020972/VPPLT-1964_Y-28mm_merged.h5'
+
+# src = '/data2/2BM/2026-04-Herrera-1020972/VPPLT-1964_Y-33mm_061.h5'
+# dst = '/data2/2BM/2026-04-Herrera-1020972/VPPLT-1964_Y-33mm_merged.h5'
+
+# src = '/data2/2BM/2026-04-Herrera-1020972/VPPLT-1964_Y-38mm_081.h5'
+# dst = '/data2/2BM/2026-04-Herrera-1020972/VPPLT-1964_Y-38mm_merged.h5'
+
+# src = '/data2/2BM/2026-04-Herrera-1020972/LowerJawJussaricColombia_Y-33mm_040.h5'
+# dst = '/data2/2BM/2026-04-Herrera-1020972/LowerJawJussaricColombia_Y-33mm_merged.h5'
+
+# src = '/data2/2BM/2026-04-Herrera-1020972/LowerJawJussaricColombia_Y-38mm_020.h5'
+# dst = '/data2/2BM/2026-04-Herrera-1020972/LowerJawJussaricColombia_Y-38mm_merged.h5'
+
 
 groups = ['/process', '/measurement', '/defaults']
 
